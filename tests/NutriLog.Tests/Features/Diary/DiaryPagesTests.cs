@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NutriLog.Data;
 using NutriLog.Features.Diary;
 using NutriLog.Features.Foods;
+using NutriLog.Features.Targets;
 using NutriLog.Tests.Data;
 
 namespace NutriLog.Tests.Features.Diary;
@@ -24,6 +25,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         Services.AddSingleton<IDiary>(data.Diary);
         Services.AddSingleton<IFoods>(new NutriLog.Features.Foods.Foods(data.Factory, data.Time));
         Services.AddSingleton<NutriLog.Features.Recipes.IRecipes>(new NutriLog.Features.Recipes.Recipes(data.Factory, data.Time));
+        Services.AddSingleton<ITargets>(new NutriLog.Features.Targets.Targets(data.Factory, new NutriLog.Tests.Features.Targets.FakeRunStats()));
         Navigation.NavigateTo(url);
         return data;
     }

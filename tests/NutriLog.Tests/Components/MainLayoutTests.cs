@@ -35,10 +35,10 @@ public class MainLayoutTests : BunitContext
     }
 
     [Fact]
-    public void The_header_links_the_diary_and_the_recipes()
+    public void The_header_links_the_diary_the_recipes_and_the_targets()
     {
         var links = Render().FindAll("header nav a");
 
-        Assert.Equal([("Diary", ""), ("Recipes", "recipes")], links.Select(a => (a.TextContent, a.GetAttribute("href"))));
+        Assert.Equal([("Diary", ""), ("Recipes", "recipes"), ("Targets", "targets")], links.Select(a => (a.TextContent, a.GetAttribute("href"))));
     }
 }

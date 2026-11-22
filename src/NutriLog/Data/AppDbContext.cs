@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
     public DbSet<DiaryEntry> DiaryEntries => Set<DiaryEntry>();
     public DbSet<DiaryEntryNutrient> DiaryEntryNutrients => Set<DiaryEntryNutrient>();
+    public DbSet<NutrientTarget> NutrientTargets => Set<NutrientTarget>();
     public DbSet<DataImport> DataImports => Set<DataImport>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -100,6 +101,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasKey(x => new { x.DiaryEntryId, x.NutrientId });
             e.HasOne<Nutrient>().WithMany().HasForeignKey(x => x.NutrientId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable(t => t.HasCheckConstraint("CK_DiaryEntryNutrients_PerServing", "\"PerServing\" >= 0"));
+        });
+
+        modelBuilder.Entity<NutrientTarget>(e =>
+        {
+            e.HasKey(x => x.NutrientId);
+            e.HasOne<Nutrient>().WithMany().HasForeignKey(x => x.NutrientId).OnDelete(DeleteBehavior.Restrict);
+            // A NULL end makes a comparison NULL, which a check constraint lets through: they hold for open ranges too.
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_NutrientTargets_MinimumOrMaximum", "\"Minimum\" IS NOT NULL OR \"Maximum\" IS NOT NULL");
+                t.HasCheckConstraint("CK_NutrientTargets_Range", "\"Minimum\" <= \"Maximum\"");
+                t.HasCheckConstraint("CK_NutrientTargets_NotNegative", "\"Minimum\" >= 0 AND \"Maximum\" >= 0 AND \"ExtraPerRunKm\" >= 0");
+            });
         });
 
         modelBuilder.Entity<DataImport>(e =>

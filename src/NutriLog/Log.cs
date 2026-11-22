@@ -26,4 +26,8 @@ public static partial class Log
 
     [LoggerMessage(EventId = 12, Level = LogLevel.Error, Message = "Import of {File} failed: {Reason}")]
     public static partial void ImportFailed(this ILogger logger, string file, string reason);
+
+    [LoggerMessage(EventId = 20, Level = LogLevel.Warning,
+        Message = "RunStats couldn't be reached for the runs of {Date}, the day shows the base targets: {ErrorType}: {ErrorMessage}")]
+    public static partial void RunStatsUnavailable(this ILogger logger, string date, string errorType, string errorMessage);
 }
