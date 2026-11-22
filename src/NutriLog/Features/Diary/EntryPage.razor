@@ -1,0 +1,52 @@
+@page "/entry/{EntryId:int}"
+@rendermode InteractiveServer
+@inject IDiary Diary
+@inject Clock Clock
+@inject NavigationManager Navigation
+
+<PageTitle>NutriLog · Edit entry</PageTitle>
+
+@if (entry is null)
+{
+    @if (loaded)
+    {
+        <h1>Entry not found</h1>
+        <p><a href="">Back to today</a></p>
+    }
+}
+else
+{
+    <nav class="back-nav">
+        <a href="@DiaryUrls.Day(entry.Date)">‹ @DiaryUrls.DayTitle(entry.Date, Clock.Today)</a>
+    </nav>
+    <h1>Edit entry</h1>
+    <AmountForm Food="entry.Food" Initial="entry.Amount" InitialMeal="entry.Meal" SubmitLabel="Save" OnSubmit="SaveAsync">
+        <button type="button" class="button danger" @onclick="DeleteAsync">Delete</button>
+    </AmountForm>
+}
+
+@code {
+    [Parameter]
+    public int EntryId { get; set; }
+
+    EntryDetails? entry;
+    bool loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        entry = await Diary.GetEntryAsync(EntryId);
+        loaded = true;
+    }
+
+    async Task SaveAsync((Meal Meal, EntryAmount Amount) input)
+    {
+        await Diary.UpdateEntryAsync(EntryId, input.Meal, input.Amount);
+        Navigation.NavigateTo(DiaryUrls.Day(entry!.Date));
+    }
+
+    async Task DeleteAsync()
+    {
+        await Diary.DeleteEntryAsync(EntryId);
+        Navigation.NavigateTo(DiaryUrls.Day(entry!.Date));
+    }
+}

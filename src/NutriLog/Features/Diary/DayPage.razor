@@ -1,0 +1,125 @@
+@page "/"
+@rendermode InteractiveServer
+@inject IDiary Diary
+@inject Clock Clock
+@inject NavigationManager Navigation
+
+<PageTitle>NutriLog · @title</PageTitle>
+
+<nav class="day-nav" aria-label="Day">
+    <a class="day-step" href="@DiaryUrls.Day(date.AddDays(-1))" aria-label="Previous day">‹</a>
+    <div class="day-title">
+        <h1>@title</h1>
+        <input type="date" aria-label="Go to date" value="@DiaryUrls.Format(date)" @onchange="GoToDate" />
+    </div>
+    <a class="day-step" href="@DiaryUrls.Day(date.AddDays(1))" aria-label="Next day">›</a>
+</nav>
+
+@if (day is not null)
+{
+    <NutrientSummary Totals="day.Totals" Label="Day total" />
+
+    @foreach (var meal in day.Meals)
+    {
+        <section class="card meal" aria-labelledby="meal-@meal.Meal">
+            <header class="meal-header">
+                <h2 id="meal-@meal.Meal">@meal.Meal</h2>
+                @if (meal.Entries.Count > 0)
+                {
+                    <span class="meal-energy">@NutrientFormat.WithUnit(meal.Totals[Nutrients.Energy], "kcal")</span>
+                }
+            </header>
+            @if (meal.Entries.Count > 0)
+            {
+                <ul class="entries">
+                    @foreach (var entry in meal.Entries)
+                    {
+                        <li>
+                            <a href="@DiaryUrls.Entry(entry.Id)">
+                                <span class="entry-name">@entry.Name</span>
+                                <span class="entry-amount muted">@entry.Amount</span>
+                                <span class="entry-energy">@NutrientFormat.WithUnit(entry.Nutrients[Nutrients.Energy], "kcal")</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+                <p class="meal-macros muted">
+                    P @NutrientFormat.WithUnit(meal.Totals[Nutrients.Protein], "g") ·
+                    C @NutrientFormat.WithUnit(meal.Totals[Nutrients.Carbohydrate], "g") ·
+                    F @NutrientFormat.WithUnit(meal.Totals[Nutrients.Fat], "g")
+                </p>
+            }
+            <a class="add-link" href="@DiaryUrls.Add(date, meal.Meal)">+ Add food</a>
+        </section>
+    }
+
+    <details class="card copy">
+        <summary>Copy from another day</summary>
+        <div class="form-row">
+            <label>
+                From
+                <input type="date" @bind="copyFrom" />
+            </label>
+            <label>
+                What
+                <select @bind="copyMeal">
+                    <option value="">Whole day</option>
+                    @foreach (var meal in Enum.GetValues<Meal>())
+                    {
+                        <option value="@meal">@meal</option>
+                    }
+                </select>
+            </label>
+        </div>
+        <button type="button" class="button" @onclick="CopyAsync">Copy to @title.ToLowerInvariant()</button>
+        @if (copyMessage is not null)
+        {
+            <p class="copy-message" role="status">@copyMessage</p>
+        }
+    </details>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? DateText { get; set; }
+
+    DateOnly date;
+    string title = "";
+    DiaryDay? day;
+    DateOnly copyFrom;
+    string copyMeal = "";
+    string? copyMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var today = Clock.Today;
+        date = DiaryUrls.ParseDate(DateText) ?? today;
+        title = DiaryUrls.DayTitle(date, today);
+        copyFrom = date.AddDays(-1);
+        copyMessage = null;
+        day = await Diary.GetDayAsync(date);
+    }
+
+    void GoToDate(ChangeEventArgs e)
+    {
+        if (DiaryUrls.ParseDate(e.Value as string) is { } chosen)
+            Navigation.NavigateTo(DiaryUrls.Day(chosen));
+    }
+
+    async Task CopyAsync()
+    {
+        if (copyFrom == date)
+        {
+            copyMessage = "Choose another day to copy from.";
+            return;
+        }
+        var meal = DiaryUrls.ParseMeal(copyMeal);
+        var copied = await Diary.CopyAsync(copyFrom, date, meal);
+        var what = meal is null ? "" : $" from {meal}";
+        var entries = copied == 1 ? "entry" : "entries";
+        copyMessage = copied == 0
+            ? $"Nothing to copy{what} on {DiaryUrls.DayTitle(copyFrom, Clock.Today)}."
+            : $"Copied {copied} {entries}{what}.";
+        day = await Diary.GetDayAsync(date);
+    }
+}

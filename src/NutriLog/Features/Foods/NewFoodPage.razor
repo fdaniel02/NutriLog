@@ -1,0 +1,153 @@
+@page "/foods/new"
+@rendermode InteractiveServer
+@inject IFoods Foods
+@inject Clock Clock
+@inject NavigationManager Navigation
+
+<PageTitle>NutriLog · New food</PageTitle>
+
+<nav class="back-nav">
+    <a href="@DiaryUrls.Add(date, meal)">‹ Add to @meal</a>
+</nav>
+<h1>New food</h1>
+
+<form class="card food-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <label class="wide">
+        Name
+        <input type="text" required maxlength="@AppDbContext.MaxNameLength" @bind="name" />
+    </label>
+    <label>
+        Values per
+        <select @bind="basis">
+            <option value="@FoodBasis.Grams">100 g</option>
+            <option value="@FoodBasis.Millilitres">100 ml</option>
+        </select>
+    </label>
+
+    <fieldset class="nutrient-inputs">
+        <legend>From the label</legend>
+        @foreach (var nutrient in LabelNutrients)
+        {
+            <label>
+                @nutrient.Name (@nutrient.Unit)
+                <input type="number" inputmode="decimal" step="any" min="0" @bind="values[nutrient.Id]" />
+            </label>
+        }
+        <label>
+            Salt (g)
+            <input type="number" inputmode="decimal" step="any" min="0" @bind="salt" />
+        </label>
+    </fieldset>
+
+    <details>
+        <summary>More nutrients</summary>
+        <fieldset class="nutrient-inputs">
+            <legend class="visually-hidden">More nutrients</legend>
+            @foreach (var nutrient in OtherNutrients)
+            {
+                <label>
+                    @nutrient.Name (@nutrient.Unit)
+                    <input type="number" inputmode="decimal" step="any" min="0" @bind="values[nutrient.Id]" />
+                </label>
+            }
+        </fieldset>
+    </details>
+
+    <fieldset class="portions">
+        <legend>Portions</legend>
+        @foreach (var portion in portions)
+        {
+            <div class="portion-row">
+                <input type="text" aria-label="Portion name" placeholder="e.g. 1 slice" maxlength="@AppDbContext.MaxPortionNameLength" @bind="portion.Name" />
+                <input type="number" aria-label="Portion size" inputmode="decimal" step="any" min="0" placeholder="@Unit" @bind="portion.Grams" />
+                <button type="button" class="button" aria-label="Remove portion" @onclick="() => portions.Remove(portion)">✕</button>
+            </div>
+        }
+        <button type="button" class="button" @onclick="() => portions.Add(new PortionInput())">+ Portion</button>
+    </fieldset>
+
+    @if (error is not null)
+    {
+        <p class="form-error" role="alert">@error</p>
+    }
+    <div class="form-actions">
+        <button type="submit" class="button primary" disabled="@busy">Save and add</button>
+    </div>
+</form>
+
+@code {
+    // Sodium is entered as salt, which is what labels in the EU state.
+    public const double SodiumMgPerGramSalt = 400;
+
+    static readonly string[] LabelIds =
+        [Nutrients.Energy, Nutrients.Fat, "saturated_fat", Nutrients.Carbohydrate, Nutrients.Sugars, Nutrients.Fibre, Nutrients.Protein];
+    static readonly IReadOnlyList<Nutrient> LabelNutrients = LabelIds.Select(id => Nutrients.All.Single(n => n.Id == id)).ToList();
+    static readonly IReadOnlyList<Nutrient> OtherNutrients =
+        Nutrients.All.Where(n => !LabelIds.Contains(n.Id) && n.Id != Sodium).ToList();
+    const string Sodium = "sodium";
+
+    sealed class PortionInput
+    {
+        public string Name { get; set; } = "";
+        public double? Grams { get; set; }
+    }
+
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? DateText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "meal")]
+    public string? MealText { get; set; }
+
+    DateOnly date;
+    Meal meal;
+    string name = "";
+    FoodBasis basis = FoodBasis.Grams;
+    readonly Dictionary<string, double?> values = Nutrients.All.ToDictionary(n => n.Id, _ => (double?)null);
+    double? salt;
+    readonly List<PortionInput> portions = [];
+    string? error;
+    bool busy;
+
+    string Unit => basis == FoodBasis.Millilitres ? "ml" : "g";
+
+    protected override void OnParametersSet()
+    {
+        date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
+        meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
+    }
+
+    public static Dictionary<string, double> Per100(IReadOnlyDictionary<string, double?> values, double? salt)
+    {
+        var per100 = values.Where(v => v.Value is not null && v.Key != Sodium).ToDictionary(v => v.Key, v => v.Value!.Value);
+        if (salt is { } grams)
+            per100[Sodium] = grams * SodiumMgPerGramSalt;
+        return per100;
+    }
+
+    async Task SaveAsync()
+    {
+        if (busy)
+            return;
+        var filled = portions.Where(p => !string.IsNullOrWhiteSpace(p.Name) || p.Grams is not null).ToList();
+        if (filled.Any(p => string.IsNullOrWhiteSpace(p.Name) || p.Grams is not > 0))
+        {
+            error = $"Each portion needs a name and a size in {Unit}.";
+            return;
+        }
+        busy = true;
+        try
+        {
+            var id = await Foods.CreateOwnAsync(new NewFood(name, basis, Per100(values, salt),
+                filled.Select(p => new NewPortion(p.Name, p.Grams!.Value)).ToList()));
+            Navigation.NavigateTo(DiaryUrls.Add(date, meal, id));
+        }
+        catch (InvalidFoodException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

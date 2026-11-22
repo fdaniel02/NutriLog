@@ -1,0 +1,115 @@
+<form class="card amount-form" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+    <h2>@Food.Name</h2>
+    <div class="form-row">
+        <label>
+            Amount
+            <input type="number" inputmode="decimal" step="any" min="0" required @bind="quantity" />
+        </label>
+        <label>
+            Unit
+            <select @bind="unit">
+                <option value="">@Food.Unit</option>
+                @foreach (var portion in Food.Portions)
+                {
+                    <option value="@portion.Id">@portion.Name (@NutrientFormat.Amount(portion.Grams) @Food.Unit)</option>
+                }
+            </select>
+        </label>
+        <label>
+            Meal
+            <select @bind="meal">
+                @foreach (var m in Enum.GetValues<Meal>())
+                {
+                    <option value="@m">@m</option>
+                }
+            </select>
+        </label>
+    </div>
+    @if (Amount is { } amount)
+    {
+        var totals = Food.Nutrients(amount);
+        <p class="amount-preview">
+            @Food.Describe(amount):
+            @NutrientFormat.WithUnit(totals[Nutrients.Energy], "kcal") ·
+            P @NutrientFormat.WithUnit(totals[Nutrients.Protein], "g") ·
+            C @NutrientFormat.WithUnit(totals[Nutrients.Carbohydrate], "g") ·
+            F @NutrientFormat.WithUnit(totals[Nutrients.Fat], "g")
+        </p>
+    }
+    else
+    {
+        <p class="amount-preview muted">Enter an amount above 0.</p>
+    }
+    <div class="form-actions">
+        <button type="submit" class="button primary" disabled="@(Amount is null || busy)">@SubmitLabel</button>
+        @ChildContent
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired]
+    public FoodChoice Food { get; set; } = null!;
+
+    [Parameter]
+    public EntryAmount? Initial { get; set; }
+
+    [Parameter]
+    public Meal InitialMeal { get; set; }
+
+    [Parameter]
+    public string SubmitLabel { get; set; } = "Add";
+
+    [Parameter]
+    public EventCallback<(Meal Meal, EntryAmount Amount)> OnSubmit { get; set; }
+
+    // Further buttons next to the submit button.
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    const double DefaultGrams = 100;
+
+    double? quantity;
+    string unit = "";
+    Meal meal;
+    bool busy;
+    int? foodId;
+
+    protected override void OnParametersSet()
+    {
+        if (foodId == Food.Id)
+            return;
+        foodId = Food.Id;
+        var start = Initial ?? Food.LastAmount ?? new EntryAmount(DefaultGrams, null);
+        if (start.PortionId is { } id && Food.Portions.All(p => p.Id != id))
+            start = new EntryAmount(DefaultGrams, null);
+        quantity = start.Quantity;
+        unit = start.PortionId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        meal = InitialMeal;
+    }
+
+    EntryAmount? Amount
+    {
+        get
+        {
+            if (quantity is not { } q || q <= 0 || !double.IsFinite(q))
+                return null;
+            int? portionId = int.TryParse(unit, out var id) ? id : null;
+            return new EntryAmount(q, portionId);
+        }
+    }
+
+    async Task SubmitAsync()
+    {
+        if (Amount is not { } amount || busy)
+            return;
+        busy = true;
+        try
+        {
+            await OnSubmit.InvokeAsync((meal, amount));
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

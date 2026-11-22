@@ -1,0 +1,113 @@
+@page "/add"
+@rendermode InteractiveServer
+@inject IDiary Diary
+@inject Clock Clock
+@inject NavigationManager Navigation
+
+<PageTitle>NutriLog · Add food</PageTitle>
+
+<nav class="back-nav">
+    <a href="@DiaryUrls.Day(date)">‹ @DiaryUrls.DayTitle(date, Clock.Today)</a>
+</nav>
+<h1>Add to @meal</h1>
+
+@if (food is not null)
+{
+    <AmountForm Food="food" InitialMeal="meal" SubmitLabel="Add" OnSubmit="AddAsync">
+        <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
+    </AmountForm>
+}
+else
+{
+    <section class="card search">
+        <input type="search" class="search-input" placeholder="Search foods" aria-label="Search foods" autocomplete="off"
+               @bind="query" @bind:event="oninput" @bind:after="SearchAsync" />
+        @if (matches is { Count: > 0 })
+        {
+            @if (string.IsNullOrWhiteSpace(query))
+            {
+                <p class="muted search-hint">Recent and frequent</p>
+            }
+            <ul class="matches">
+                @foreach (var match in matches)
+                {
+                    <li>
+                        <a href="@DiaryUrls.Add(date, meal, match.Id)">
+                            <span class="match-name">@match.Name</span>
+                            <span class="match-details muted">@Details(match)</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+        else if (matches is not null)
+        {
+            <p class="muted search-hint">@(string.IsNullOrWhiteSpace(query) ? "Search for a food to add." : "No food found.")</p>
+        }
+        <a class="add-link" href="@DiaryUrls.NewFood(date, meal)">+ New food from a label</a>
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? DateText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "meal")]
+    public string? MealText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "food")]
+    public int? FoodId { get; set; }
+
+    DateOnly date;
+    Meal meal;
+    FoodChoice? food;
+    string query = "";
+    IReadOnlyList<FoodMatch>? matches;
+    int searchVersion;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
+        meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
+        food = FoodId is { } id ? await Diary.GetFoodAsync(id) : null;
+        if (food is null && matches is null)
+            await SearchAsync();
+    }
+
+    async Task SearchAsync()
+    {
+        // Results of an older, slower search must not replace those of the latest keystroke.
+        var version = ++searchVersion;
+        var found = await Diary.SearchFoodsAsync(query);
+        if (version == searchVersion)
+            matches = found;
+    }
+
+    async Task AddAsync((Meal Meal, EntryAmount Amount) input)
+    {
+        await Diary.AddEntryAsync(date, input.Meal, food!.Id, input.Amount);
+        Navigation.NavigateTo(DiaryUrls.Day(date));
+    }
+
+    public static string Details(FoodMatch match)
+    {
+        var parts = new List<string>();
+        if (match.Recent)
+            parts.Add("Recent");
+        parts.Add(SourceName(match.Source));
+        if (match.EnergyPer100 is { } kcal)
+        {
+            var unit = match.Basis == FoodBasis.Millilitres ? "ml" : "g";
+            parts.Add($"{NutrientFormat.Amount(kcal)} kcal/100 {unit}");
+        }
+        return string.Join(" · ", parts);
+    }
+
+    public static string SourceName(FoodSource source) => source switch
+    {
+        FoodSource.Nevo => "NEVO",
+        FoodSource.UsdaFoundation or FoodSource.UsdaSrLegacy => "USDA",
+        FoodSource.Off => "Open Food Facts",
+        _ => "Own"
+    };
+}
