@@ -9,7 +9,8 @@ using NutriLog.Tests.Data;
 
 namespace NutriLog.Tests.Features.Diary;
 
-// The pages with the real diary on a database, as the services they inject.
+// The pages with the real diary on a database, as the services they inject. Form changes are retried until they
+// show: an input changed right after the page appears is sometimes rendered over by a late render of the page.
 [Collection("Postgres")]
 public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
 {
@@ -124,9 +125,13 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<AddPage>();
         page.WaitForElement("form.amount-form");
 
-        page.Find("input[type=number]").Change("3");
-        page.FindAll("form select")[0].Change(bread.Portions[0].Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        Assert.StartsWith("3 × slice · 105 g: 263 kcal", string.Join(' ', page.Find(".amount-preview").TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)));
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=number]").Change("3");
+            page.FindAll("form select")[0].Change(bread.Portions[0].Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Assert.StartsWith("3 × slice · 105 g: 263 kcal",
+                string.Join(' ', page.Find(".amount-preview").TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)));
+        });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
@@ -143,8 +148,12 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<EntryPage>(p => p.Add(e => e.EntryId, id));
         page.WaitForElement("form.amount-form");
 
-        page.Find("input[type=number]").Change("50");
-        page.FindAll("form select")[1].Change(nameof(Meal.Snack));
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=number]").Change("50");
+            page.FindAll("form select")[1].Change(nameof(Meal.Snack));
+            Assert.Equal(("50", nameof(Meal.Snack)), (page.Find("input[type=number]").GetAttribute("value"), page.FindAll("form select")[1].GetAttribute("value")));
+        });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
