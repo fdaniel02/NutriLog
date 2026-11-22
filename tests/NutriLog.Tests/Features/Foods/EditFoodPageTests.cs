@@ -23,6 +23,7 @@ public class EditFoodPageTests(PostgresFixture postgres) : BunitContext
         Services.AddSingleton(data.Clock);
         Services.AddSingleton<IDiary>(data.Diary);
         Services.AddSingleton<IFoods>(new NutriLog.Features.Foods.Foods(data.Factory, data.Time));
+        Services.AddSingleton<NutriLog.Features.Recipes.IRecipes>(new NutriLog.Features.Recipes.Recipes(data.Factory, data.Time));
         Navigation.NavigateTo(url);
         return data;
     }
