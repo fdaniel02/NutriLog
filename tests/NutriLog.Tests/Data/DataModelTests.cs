@@ -7,7 +7,7 @@ namespace NutriLog.Tests.Data;
 
 // Against a migrated PostgreSQL, so the constraints tested are the ones the migrations create.
 [Collection("Postgres")]
-public class DataModelTests(PostgresFixture postgres) : IAsyncLifetime
+public sealed class DataModelTests(PostgresFixture postgres) : IAsyncLifetime
 {
     PooledDbContextFactory<AppDbContext> factory = null!;
 
