@@ -32,5 +32,3 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 await app.RunAsync();
-
-public partial class Program;

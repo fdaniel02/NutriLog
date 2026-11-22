@@ -29,21 +29,36 @@
     border-radius: 0.5rem;
     box-shadow: 0 3px 6px 2px rgba(0, 0, 0, 0.3);
     opacity: 0;
-    transition: display 0.5s allow-discrete, overlay 0.5s allow-discrete;
-    animation: components-reconnect-modal-fadeOutOpacity 0.5s both;
-    &[open]
-
-{
-    animation: components-reconnect-modal-slideUp 1.5s cubic-bezier(.05, .89, .25, 1.02) 0.3s, components-reconnect-modal-fadeInOpacity 0.5s ease-in-out 0.3s;
-    animation-fill-mode: both;
 }
 
-}
+    #components-reconnect-modal[open] {
+        opacity: 1;
+    }
 
 #components-reconnect-modal::backdrop {
     background-color: rgba(0, 0, 0, 0.4);
-    animation: components-reconnect-modal-fadeInOpacity 0.5s ease-in-out;
     opacity: 1;
+}
+
+/* With reduced motion the dialog just appears; the opacity rules above keep it visible without the fade-in. */
+@media (prefers-reduced-motion: no-preference) {
+    #components-reconnect-modal {
+        transition: display 0.5s allow-discrete, overlay 0.5s allow-discrete;
+        animation: components-reconnect-modal-fadeOutOpacity 0.5s both;
+    }
+
+        #components-reconnect-modal[open] {
+            animation: components-reconnect-modal-slideUp 1.5s cubic-bezier(.05, .89, .25, 1.02) 0.3s, components-reconnect-modal-fadeInOpacity 0.5s ease-in-out 0.3s;
+            animation-fill-mode: both;
+        }
+
+        #components-reconnect-modal::backdrop {
+            animation: components-reconnect-modal-fadeInOpacity 0.5s ease-in-out;
+        }
+
+    .components-rejoining-animation div {
+        animation: components-rejoining-animation 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    }
 }
 
 @keyframes components-reconnect-modal-slideUp {
@@ -90,18 +105,18 @@
 
 #components-reconnect-modal button {
     border: 0;
-    background-color: #6b9ed2;
+    background-color: #3b6ea2;
     color: white;
     padding: 4px 24px;
     border-radius: 4px;
 }
 
     #components-reconnect-modal button:hover {
-        background-color: #3b6ea2;
+        background-color: #2d5580;
     }
 
     #components-reconnect-modal button:active {
-        background-color: #6b9ed2;
+        background-color: #3b6ea2;
     }
 
 .components-rejoining-animation {
@@ -115,7 +130,6 @@
         border: 3px solid #0087ff;
         opacity: 1;
         border-radius: 50%;
-        animation: components-rejoining-animation 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
     }
 
         .components-rejoining-animation div:nth-child(2) {
