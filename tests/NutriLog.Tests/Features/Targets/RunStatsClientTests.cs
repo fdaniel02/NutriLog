@@ -112,7 +112,7 @@ public class RunStatsClientTests
     [Theory]
     [InlineData("http://localhost:5310")]
     [InlineData("http://localhost:5310/")]
-    public void The_base_address_ends_with_a_slash_so_paths_are_relative_to_it(string configured)
+    public void The_base_address_is_the_root_of_the_host(string configured)
     {
         Assert.Equal(new Uri("http://localhost:5310/"), RunStatsClient.BaseAddress(configured));
     }

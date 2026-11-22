@@ -32,11 +32,11 @@ public sealed class RunStatsClient(HttpClient http, ILogger<RunStatsClient> logg
         }
     }
 
-    // Without the trailing slash, the relative request path would replace the base address' last segment.
+    // RunStats is served at the root of its host; the request path is relative to it.
     public static Uri BaseAddress(string? configured) =>
         string.IsNullOrWhiteSpace(configured)
             ? throw new InvalidOperationException("Setting 'RunStats:BaseUrl' is missing (e.g. 'http://runstats.runstats.svc').")
-            : new Uri(configured.TrimEnd('/') + '/');
+            : new Uri(configured);
 
     // Only what the targets use of RunStats' GET /api/runs rows.
     sealed record RunRow(double DistanceMeters, double? Calories);
