@@ -36,7 +36,7 @@ public sealed class RunStatsClient(HttpClient http, ILogger<RunStatsClient> logg
     public static Uri BaseAddress(string? configured) =>
         string.IsNullOrWhiteSpace(configured)
             ? throw new InvalidOperationException("Setting 'RunStats:BaseUrl' is missing (e.g. 'http://runstats.runstats.svc').")
-            : new Uri(configured.TrimEnd('/') + "/");
+            : new Uri(configured.TrimEnd('/') + '/');
 
     // Only what the targets use of RunStats' GET /api/runs rows.
     sealed record RunRow(double DistanceMeters, double? Calories);
