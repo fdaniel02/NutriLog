@@ -2,6 +2,7 @@
   "platformOptions": {
     "Coverlet": {
       "include": "[NutriLog]*",
+      "excludeByFile": "**/Migrations/*.cs",
       "excludeByAttribute": "GeneratedCodeAttribute",
       "format": "opencover"
     }
