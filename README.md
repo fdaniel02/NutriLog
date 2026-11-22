@@ -52,13 +52,42 @@ dotnet ef migrations add <Name> --project src/NutriLog
 
 - **Nutrients**: a fixed list (energy, macros, fatty acids, vitamins, minerals), each with its unit, seeded by the
   migrations (`Data/Nutrients.cs`). The ids never change; adding a nutrient takes a migration.
-- **Foods**: name, source (`Nevo`, `Usda`, `Off`, `Own`) and the id there, barcode, and nutrient values per 100 g
-  (or 100 ml). A nutrient without a value has no row: missing, never 0.
-- **Portions** per food, e.g. "slice" = 35 g.
+- **Foods**: English name and Dutch name, source (`Nevo`, `UsdaFoundation`, `UsdaSrLegacy`, `Off`, `Own`) and the id
+  there, barcode, and nutrient values per 100 g (or 100 ml). A nutrient without a value has no row: missing, never 0.
+- **Portions** per food, e.g. "slice" = 35 g. Imported ones are marked; portions added by hand are never touched by an
+  import.
 - **Recipes**: foods with grams, and the number of servings it makes.
 - **Diary entries**: date, meal, and either a food in grams or portions, or a recipe in servings. Check constraints
   keep these combinations valid. A food or recipe that's in a recipe or the diary can't be deleted, so past days keep
   their numbers.
+- **Data imports**: one row per import run; the latest per source gives the version in the source reference at the
+  bottom of every page.
+
+## Food data
+
+Foods come from two food composition databases, imported with the app itself. It applies the migrations, imports, and
+exits without starting the web server:
+
+```powershell
+dotnet run --project src/NutriLog -- import nevo C:\Temp\NEVO\NEVO2025_v9.0.csv
+dotnet run --project src/NutriLog -- import usda <folder>\FoodData_Central_foundation_food_json_2026-10-29.zip
+dotnet run --project src/NutriLog -- import usda <folder>\FoodData_Central_sr_legacy_food_json_2018-04.zip
+```
+
+- **NEVO** (RIVM): the main source, for foods as sold in the Netherlands. Request the dataset at
+  [rivm.nl](https://www.rivm.nl/en/dutch-food-composition-database/use-of-nevo-online/request-dataset) and import the
+  main file, `NEVO<year>_v<version>.csv`. Its conditions of use don't allow passing the data on, so the file never goes
+  into git or the image, and the tests use made-up rows in its format. NEVO's values are used unchanged; the app shows
+  the reference the conditions require.
+- **USDA FoodData Central** (public domain): Foundation Foods and SR Legacy, as the JSON zips from
+  [fdc.nal.usda.gov](https://fdc.nal.usda.gov/download-datasets), under USDA's file names (the release date is read
+  from them). Energy falls back to the Atwater factors where Foundation Foods has no plain energy value; folate is in
+  dietary folate equivalents where available, like NEVO's. Only portions that count something are imported ("medium",
+  "slice", "egg"), not measures like cups, spoons or ounces.
+
+Running an import again (for a new release) updates foods by their id in the source, so diary entries keep pointing at
+the same food. Foods missing from the new release are removed, unless a recipe or the diary uses them. Each run logs
+its counts (event id 11) and is recorded in `DataImports`.
 
 ## Configuration
 

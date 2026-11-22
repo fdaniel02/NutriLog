@@ -6,8 +6,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using NutriLog;
 using NutriLog.Components;
 using NutriLog.Data;
+using NutriLog.Features.Sources;
+using NutriLog.Import;
 
-var builder = WebApplication.CreateBuilder(args);
+// An import's arguments aren't settings; a path starting with "/" would otherwise be read as one.
+var builder = WebApplication.CreateBuilder(ImportCommand.IsImport(args) ? [] : args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -35,6 +38,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 builder.Services.AddAppTelemetry(builder.Configuration);
 builder.Services.AddSingleton<DatabaseMigrator>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddTransient<ISourceQueries, SourceQueries>();
+builder.Services.AddTransient<FoodImporter>();
+builder.Services.AddTransient<ImportCommand>();
 
 // Disposing the app on exit flushes the console logger's queue, so the last error is written before the process ends.
 await using var app = builder.Build();
@@ -42,6 +49,9 @@ await using var app = builder.Build();
 try
 {
     await app.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync();
+
+    if (ImportCommand.IsImport(args))
+        return await app.Services.GetRequiredService<ImportCommand>().RunAsync(args);
 
     app.UseForwardedHeaders();
 

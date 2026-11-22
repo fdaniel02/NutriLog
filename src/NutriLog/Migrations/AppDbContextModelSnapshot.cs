@@ -41,6 +41,50 @@ namespace NutriLog.Migrations
                     b.ToTable("DataProtectionKeys");
                 });
 
+            modelBuilder.Entity("NutriLog.Data.DataImport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Added")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ImportedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Kept")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Removed")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Unchanged")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Updated")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source", "ImportedUtc");
+
+                    b.ToTable("DataImports");
+                });
+
             modelBuilder.Entity("NutriLog.Data.DiaryEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -128,11 +172,15 @@ namespace NutriLog.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("NameNl")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Source")
                         .IsRequired()
-                        .HasMaxLength(10)
+                        .HasMaxLength(20)
                         .IsUnicode(false)
-                        .HasColumnType("character varying(10)");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("SourceId")
                         .HasMaxLength(50)
@@ -483,6 +531,9 @@ namespace NutriLog.Migrations
 
                     b.Property<double>("Grams")
                         .HasColumnType("double precision");
+
+                    b.Property<bool>("Imported")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
