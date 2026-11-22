@@ -1,0 +1,192 @@
+@page "/recipes/new"
+@page "/recipes/{RecipeId:int}"
+@rendermode InteractiveServer
+@inject IRecipes Recipes
+@inject IDiary Diary
+@inject NavigationManager Navigation
+
+<PageTitle>NutriLog · @(RecipeId is null ? "New recipe" : "Edit recipe")</PageTitle>
+
+<nav class="back-nav">
+    <a href="@RecipeUrls.List">‹ Recipes</a>
+</nav>
+
+@if (RecipeId is not null && loaded && !found)
+{
+    <h1>Recipe not found</h1>
+}
+else if (loaded)
+{
+    <h1>@(RecipeId is null ? "New recipe" : "Edit recipe")</h1>
+
+    <form class="card food-form recipe-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label class="wide">
+            Name
+            <input type="text" required maxlength="@AppDbContext.MaxNameLength" @bind="name" />
+        </label>
+        <label>
+            Servings
+            <input type="number" inputmode="decimal" step="any" min="0" required @bind="servings" />
+        </label>
+
+        <fieldset class="ingredients">
+            <legend>Foods</legend>
+            @if (ingredients.Count == 0)
+            {
+                <p class="muted search-hint">No foods yet. Search below to add one.</p>
+            }
+            @foreach (var ingredient in ingredients)
+            {
+                <div class="ingredient-row">
+                    <span class="ingredient-name">@ingredient.Name</span>
+                    <input type="number" aria-label="Amount of @ingredient.Name" inputmode="decimal" step="any" min="0" placeholder="@ingredient.Unit" @bind="ingredient.Grams" />
+                    <span class="muted">@ingredient.Unit</span>
+                    <button type="button" class="button" aria-label="Remove @ingredient.Name" @onclick="() => ingredients.Remove(ingredient)">✕</button>
+                </div>
+            }
+        </fieldset>
+
+        <div class="search">
+            <input type="search" class="search-input" placeholder="Search foods to add" aria-label="Search foods to add" autocomplete="off"
+                   @bind="query" @bind:event="oninput" @bind:after="SearchAsync" />
+            @if (matches is { Count: > 0 } && !string.IsNullOrWhiteSpace(query))
+            {
+                <ul class="matches">
+                    @foreach (var match in matches)
+                    {
+                        <li>
+                            <button type="button" class="match-button" @onclick="() => AddIngredientAsync(match.Id)">
+                                <span class="match-name">@match.Name</span>
+                                <span class="match-details muted">@AddPage.SourceName(match.Source)</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+            else if (matches is not null && !string.IsNullOrWhiteSpace(query))
+            {
+                <p class="muted search-hint">No food found.</p>
+            }
+        </div>
+
+        @if (error is not null)
+        {
+            <p class="form-error" role="alert">@error</p>
+        }
+        <div class="form-actions">
+            <button type="submit" class="button primary" disabled="@busy">Save</button>
+            @if (RecipeId is not null)
+            {
+                <button type="button" class="button danger" @onclick="DeleteAsync">Delete</button>
+            }
+        </div>
+    </form>
+
+    <NutrientSummary Totals="PerServing" Label="Per serving" />
+}
+
+@code {
+    [Parameter]
+    public int? RecipeId { get; set; }
+
+    sealed class IngredientInput
+    {
+        public required int FoodId { get; init; }
+        public required string Name { get; init; }
+        public required string Unit { get; init; }
+        public required IReadOnlyDictionary<string, double> Per100 { get; init; }
+        public double? Grams { get; set; }
+    }
+
+    const double DefaultGrams = 100;
+
+    string name = "";
+    double? servings = 1;
+    List<IngredientInput> ingredients = [];
+    string query = "";
+    IReadOnlyList<FoodMatch>? matches;
+    int searchVersion;
+    string? error;
+    bool busy;
+    bool loaded;
+    bool found;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (RecipeId is { } id && await Recipes.GetAsync(id) is { } recipe)
+        {
+            found = true;
+            name = recipe.Name;
+            servings = recipe.Servings;
+            ingredients = recipe.Ingredients
+                .Select(i => new IngredientInput { FoodId = i.FoodId, Name = i.Name, Unit = i.Unit, Per100 = i.Per100, Grams = i.Grams })
+                .ToList();
+        }
+        loaded = true;
+    }
+
+    NutrientTotals PerServing => NutrientTotals.ForServings(RecipeNutrients.Snapshot(
+        ingredients.Where(i => i.Grams is > 0).Select(i => (i.Per100, i.Grams!.Value)),
+        servings is > 0 ? servings.Value : 1), 1);
+
+    async Task SearchAsync()
+    {
+        // Results of an older, slower search must not replace those of the latest keystroke.
+        var version = ++searchVersion;
+        var result = await Diary.SearchFoodsAsync(query);
+        if (version == searchVersion)
+            matches = result;
+    }
+
+    async Task AddIngredientAsync(int foodId)
+    {
+        if (await Diary.GetFoodAsync(foodId) is not { } food)
+            return;
+        ingredients.Add(new IngredientInput { FoodId = food.Id, Name = food.Name, Unit = food.Unit, Per100 = food.Per100, Grams = DefaultGrams });
+        query = "";
+        matches = null;
+    }
+
+    async Task SaveAsync()
+    {
+        if (busy)
+            return;
+        if (servings is null || ingredients.Any(i => i.Grams is null))
+        {
+            error = "Each food needs an amount, and the recipe a number of servings.";
+            return;
+        }
+        busy = true;
+        error = null;
+        try
+        {
+            var input = new RecipeInput(name, servings.Value, ingredients.Select(i => new RecipeIngredientInput(i.FoodId, i.Grams!.Value)).ToList());
+            if (RecipeId is { } id)
+                await Recipes.UpdateAsync(id, input);
+            else
+                await Recipes.CreateAsync(input);
+            Navigation.NavigateTo(RecipeUrls.List);
+        }
+        catch (InvalidRecipeException e)
+        {
+            error = e.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    async Task DeleteAsync()
+    {
+        switch (await Recipes.DeleteAsync(RecipeId!.Value))
+        {
+            case RecipeDeleteResult.InDiary:
+                error = "This recipe is in the diary, so it stays. Past days need it.";
+                break;
+            default:
+                Navigation.NavigateTo(RecipeUrls.List);
+                break;
+        }
+    }
+}

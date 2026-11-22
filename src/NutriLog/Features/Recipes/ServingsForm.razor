@@ -1,0 +1,91 @@
+<form class="card amount-form" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+    <h2>@Name</h2>
+    <div class="form-row">
+        <label>
+            Servings
+            <input type="number" inputmode="decimal" step="any" min="0" required @bind="servings" />
+        </label>
+        <label>
+            Meal
+            <select @bind="meal">
+                @foreach (var m in Enum.GetValues<Meal>())
+                {
+                    <option value="@m">@m</option>
+                }
+            </select>
+        </label>
+    </div>
+    @if (Servings is { } s)
+    {
+        var totals = NutrientTotals.ForServings(PerServing, s);
+        <p class="amount-preview">
+            @NutrientFormat.Servings(s):
+            @NutrientFormat.WithUnit(totals[Nutrients.Energy], "kcal") ·
+            P @NutrientFormat.WithUnit(totals[Nutrients.Protein], "g") ·
+            C @NutrientFormat.WithUnit(totals[Nutrients.Carbohydrate], "g") ·
+            F @NutrientFormat.WithUnit(totals[Nutrients.Fat], "g")
+        </p>
+    }
+    else
+    {
+        <p class="amount-preview muted">Enter a number of servings above 0.</p>
+    }
+    <div class="form-actions">
+        <button type="submit" class="button primary" disabled="@(Servings is null || busy)">@SubmitLabel</button>
+        @ChildContent
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public IReadOnlyDictionary<string, (double PerServing, bool Complete)> PerServing { get; set; } = null!;
+
+    [Parameter]
+    public double InitialServings { get; set; } = 1;
+
+    [Parameter]
+    public Meal InitialMeal { get; set; }
+
+    [Parameter]
+    public string SubmitLabel { get; set; } = "Add";
+
+    [Parameter]
+    public EventCallback<(Meal Meal, double Servings)> OnSubmit { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    double? servings;
+    Meal meal;
+    bool busy;
+    bool initialised;
+
+    protected override void OnParametersSet()
+    {
+        if (initialised)
+            return;
+        initialised = true;
+        servings = InitialServings;
+        meal = InitialMeal;
+    }
+
+    double? Servings => servings is { } s && s > 0 && double.IsFinite(s) ? s : null;
+
+    async Task SubmitAsync()
+    {
+        if (Servings is not { } s || busy)
+            return;
+        busy = true;
+        try
+        {
+            await OnSubmit.InvokeAsync((meal, s));
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

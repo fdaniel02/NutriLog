@@ -12,6 +12,8 @@ public class DiaryEntry
     public QuantityUnit QuantityUnit { get; set; }
     public int? PortionId { get; set; }
     public DateTime CreatedUtc { get; set; }
+
+    public List<DiaryEntryNutrient> Nutrients { get; init; } = [];
 }
 
 public enum Meal

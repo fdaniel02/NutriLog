@@ -8,6 +8,7 @@ using NutriLog.Components;
 using NutriLog.Data;
 using NutriLog.Features.Diary;
 using NutriLog.Features.Foods;
+using NutriLog.Features.Recipes;
 using NutriLog.Features.Sources;
 using NutriLog.Import;
 
@@ -49,6 +50,7 @@ builder.Services.AddSingleton(services =>
 });
 builder.Services.AddTransient<IDiary, Diary>();
 builder.Services.AddTransient<IFoods, Foods>();
+builder.Services.AddTransient<IRecipes, Recipes>();
 builder.Services.AddTransient<ISourceQueries, SourceQueries>();
 builder.Services.AddTransient<FoodImporter>();
 builder.Services.AddTransient<ImportCommand>();
