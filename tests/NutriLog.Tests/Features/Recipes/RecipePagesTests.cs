@@ -69,17 +69,23 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<RecipeEditPage>();
         page.WaitForElement("form.recipe-form");
 
-        page.Find("input[type=text]").Change("Porridge");
-        page.FindAll("input[type=number]")[0].Change("2");
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=text]").Change("Porridge");
+            page.FindAll("input[type=number]")[0].Change("2");
+            Assert.Equal(("Porridge", "2"), (page.Find("input[type=text]").GetAttribute("value"), page.FindAll("input[type=number]")[0].GetAttribute("value")));
+        });
         page.Find("input[type=search]").Input("oat");
         page.WaitForElement(".match-button").Click();
         page.WaitForElement("input[aria-label='Amount of Oats']");
         page.Find("input[type=search]").Input("milk");
         page.WaitForElement(".match-button").Click();
         page.WaitForElement("input[aria-label='Amount of Milk']");
-        page.Find("input[aria-label='Amount of Milk']").Change("400");
-
-        page.WaitForAssertion(() => Assert.Equal("305", page.Find(".summary-value").TextContent));
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[aria-label='Amount of Milk']").Change("400");
+            Assert.Equal("305", page.Find(".summary-value").TextContent);
+        });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(RecipeUrls.List, Navigation.Uri));
@@ -95,7 +101,11 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<RecipeEditPage>();
         page.WaitForElement("form.recipe-form");
 
-        page.Find("input[type=text]").Change("Nothing");
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=text]").Change("Nothing");
+            Assert.Equal("Nothing", page.Find("input[type=text]").GetAttribute("value"));
+        });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.Equal("Add at least one food.", page.Find(".form-error").TextContent));
@@ -109,10 +119,14 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<RecipeEditPage>(p => p.Add(r => r.RecipeId, id));
         page.WaitForElement("form.recipe-form");
 
-        page.Find("input[aria-label='Amount of Oats']").Change("");
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[aria-label='Amount of Oats']").Change("");
+            Assert.True(string.IsNullOrEmpty(page.Find("input[aria-label='Amount of Oats']").GetAttribute("value")));
+        });
         page.Find("form").Submit();
 
-        Assert.Equal("Each food needs an amount, and the recipe a number of servings.", page.Find(".form-error").TextContent);
+        page.WaitForAssertion(() => Assert.Equal("Each food needs an amount, and the recipe a number of servings.", page.Find(".form-error").TextContent));
     }
 
     [Fact]
@@ -125,7 +139,11 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         Assert.Equal("Edit recipe", page.Find("h1").TextContent);
 
         page.Find("button[aria-label='Remove Milk']").Click();
-        page.FindAll("input[type=number]")[0].Change("1");
+        page.WaitForAssertion(() =>
+        {
+            page.FindAll("input[type=number]")[0].Change("1");
+            Assert.Equal("1", page.FindAll("input[type=number]")[0].GetAttribute("value"));
+        });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(RecipeUrls.List, Navigation.Uri));
@@ -195,8 +213,11 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<AddPage>();
         page.WaitForElement("form.amount-form");
 
-        page.Find("input[type=number]").Change("1.5");
-        Assert.StartsWith("1.5 servings: 458 kcal", Squeezed(page.Find(".amount-preview").TextContent));
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=number]").Change("1.5");
+            Assert.StartsWith("1.5 servings: 458 kcal", Squeezed(page.Find(".amount-preview").TextContent));
+        });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
@@ -213,9 +234,11 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<AddPage>();
         page.WaitForElement("form.amount-form");
 
-        page.Find("input[type=number]").Change("0");
-
-        Assert.Equal("Enter a number of servings above 0.", page.Find(".amount-preview").TextContent);
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=number]").Change("0");
+            Assert.Equal("Enter a number of servings above 0.", page.Find(".amount-preview").TextContent);
+        });
         Assert.True(page.Find("button[type=submit]").HasAttribute("disabled"));
     }
 
@@ -230,8 +253,12 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         page.WaitForElement("form.amount-form");
 
         Assert.StartsWith("1 serving: 305 kcal", Squeezed(page.Find(".amount-preview").TextContent));
-        page.Find("input[type=number]").Change("2");
-        page.Find("select").Change(nameof(Meal.Dinner));
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=number]").Change("2");
+            page.Find("select").Change(nameof(Meal.Dinner));
+            Assert.Equal(("2", nameof(Meal.Dinner)), (page.Find("input[type=number]").GetAttribute("value"), page.Find("select").GetAttribute("value")));
+        });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
