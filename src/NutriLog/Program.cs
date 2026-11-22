@@ -10,6 +10,7 @@ using NutriLog.Features.Diary;
 using NutriLog.Features.Foods;
 using NutriLog.Features.Recipes;
 using NutriLog.Features.Sources;
+using NutriLog.Features.Targets;
 using NutriLog.Import;
 
 // An import's arguments aren't settings; a path starting with "/" would otherwise be read as one.
@@ -52,6 +53,12 @@ builder.Services.AddTransient<IDiary, Diary>();
 builder.Services.AddTransient<IFoods, Foods>();
 builder.Services.AddTransient<IRecipes, Recipes>();
 builder.Services.AddTransient<ISourceQueries, SourceQueries>();
+builder.Services.AddHttpClient<IRunStats, RunStatsClient>(client =>
+{
+    client.BaseAddress = RunStatsClient.BaseAddress(builder.Configuration["RunStats:BaseUrl"]);
+    client.Timeout = RunStatsClient.Timeout;
+});
+builder.Services.AddTransient<ITargets, NutriLog.Features.Targets.Targets>();
 builder.Services.AddTransient<FoodImporter>();
 builder.Services.AddTransient<ImportCommand>();
 

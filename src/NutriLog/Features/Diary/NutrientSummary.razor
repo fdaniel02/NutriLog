@@ -2,6 +2,7 @@
     <div class="summary-energy">
         <span class="summary-value">@NutrientFormat.Total(Totals[Nutrients.Energy])</span>
         <span class="muted">kcal</span>
+        @TargetOf(Nutrients.Energy)
     </div>
     <dl class="summary-macros">
         @foreach (var id in Headline)
@@ -9,7 +10,7 @@
             var nutrient = ById[id];
             <div>
                 <dt>@nutrient.Name</dt>
-                <dd>@NutrientFormat.WithUnit(Totals[id], nutrient.Unit)</dd>
+                <dd>@NutrientFormat.WithUnit(Totals[id], nutrient.Unit)@TargetOf(id)</dd>
             </div>
         }
     </dl>
@@ -24,7 +25,7 @@
                     {
                         <tr>
                             <th scope="row">@nutrient.Name</th>
-                            <td>@NutrientFormat.WithUnit(Totals[nutrient.Id], nutrient.Unit)</td>
+                            <td>@NutrientFormat.WithUnit(Totals[nutrient.Id], nutrient.Unit)@TargetOf(nutrient.Id)</td>
                         </tr>
                     }
                 </tbody>
@@ -44,6 +45,28 @@
 
     [Parameter]
     public string Label { get; set; } = "Total";
+
+    // The day's targets; meals and entries have none.
+    [Parameter]
+    public DayTargets? Targets { get; set; }
+
+    RenderFragment? TargetOf(string nutrientId)
+    {
+        if (Targets?[nutrientId] is not { } range)
+            return null;
+        var status = range.Evaluate(Totals[nutrientId]);
+        return @<span class="target @status?.ToString().ToLowerInvariant()">
+            <span class="visually-hidden">@StatusText(status), target </span>@range.Describe()
+        </span>;
+    }
+
+    static string StatusText(TargetStatus? status) => status switch
+    {
+        TargetStatus.Under => "under",
+        TargetStatus.Within => "within",
+        TargetStatus.Over => "over",
+        _ => "not known against"
+    };
 
     static string GroupName(NutrientGroup group) => group switch
     {

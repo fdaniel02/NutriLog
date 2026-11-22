@@ -1,6 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 @inject IDiary Diary
+@inject ITargets Targets
 @inject Clock Clock
 @inject NavigationManager Navigation
 
@@ -17,7 +18,15 @@
 
 @if (day is not null)
 {
-    <NutrientSummary Totals="day.Totals" Label="Day total" />
+    <NutrientSummary Totals="day.Totals" Label="Day total" Targets="targets" />
+    @if (targets?.HasTargets == true)
+    {
+        <p class="run-note muted">@targets.RunNote</p>
+    }
+    else if (targets is not null)
+    {
+        <p class="run-note muted"><a href="targets">Set targets</a> to see the day against them.</p>
+    }
 
     @foreach (var meal in day.Meals)
     {
@@ -86,6 +95,8 @@
     DateOnly date;
     string title = "";
     DiaryDay? day;
+    // Null while loading: RunStats may take up to its timeout, and the diary shouldn't wait for it.
+    DayTargets? targets;
     DateOnly copyFrom;
     string copyMeal = "";
     string? copyMessage;
@@ -97,7 +108,12 @@
         title = DiaryUrls.DayTitle(date, today);
         copyFrom = date.AddDays(-1);
         copyMessage = null;
+        targets = null;
+        var targetsTask = Targets.GetDayAsync(date);
         day = await Diary.GetDayAsync(date);
+        if (!targetsTask.IsCompleted)
+            StateHasChanged();
+        targets = await targetsTask;
     }
 
     void GoToDate(ChangeEventArgs e)

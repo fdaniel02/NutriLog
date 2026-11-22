@@ -542,6 +542,32 @@ namespace NutriLog.Migrations
                         });
                 });
 
+            modelBuilder.Entity("NutriLog.Data.NutrientTarget", b =>
+                {
+                    b.Property<string>("NutrientId")
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<double>("ExtraPerRunKm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Maximum")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Minimum")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("NutrientId");
+
+                    b.ToTable("NutrientTargets", t =>
+                        {
+                            t.HasCheckConstraint("CK_NutrientTargets_MinimumOrMaximum", "\"Minimum\" IS NOT NULL OR \"Maximum\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_NutrientTargets_NotNegative", "\"Minimum\" >= 0 AND \"Maximum\" >= 0 AND \"ExtraPerRunKm\" >= 0");
+
+                            t.HasCheckConstraint("CK_NutrientTargets_Range", "\"Minimum\" <= \"Maximum\"");
+                        });
+                });
+
             modelBuilder.Entity("NutriLog.Data.Portion", b =>
                 {
                     b.Property<int>("Id")
@@ -667,6 +693,15 @@ namespace NutriLog.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("NutriLog.Data.Nutrient", null)
+                        .WithMany()
+                        .HasForeignKey("NutrientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("NutriLog.Data.NutrientTarget", b =>
+                {
                     b.HasOne("NutriLog.Data.Nutrient", null)
                         .WithMany()
                         .HasForeignKey("NutrientId")

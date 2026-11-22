@@ -109,3 +109,18 @@ summary { cursor:pointer; }
 .ingredient-name { overflow-wrap:anywhere; }
 .ingredient-row .button { padding:0; }
 .match-button { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; padding:10px 0; border:0; background:none; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+.target { display:block; font-size:0.75rem; font-weight:normal; color:var(--muted); }
+.summary-energy .target { display:inline; font-size:0.9rem; }
+.target.under { color:#d29922; }
+.target.within { color:#3fb950; }
+.target.over { color:var(--danger); }
+.run-note { margin:-8px 0 0; font-size:0.85rem; }
+.targets-form { display:flex; flex-direction:column; gap:10px; }
+.targets-form .note { margin:0; }
+.targets-form details[open] > summary { margin-bottom:10px; }
+.target-head, .target-row { display:grid; grid-template-columns:minmax(0, 1fr) 88px 88px; gap:8px; align-items:center; }
+.target-head { color:var(--muted); font-size:0.8rem; }
+.target-row + .target-row { margin-top:8px; }
+.target-name { overflow-wrap:anywhere; }
+.target-group { font-size:0.9rem; color:var(--muted); margin:16px 0 8px; }
+.saved { margin:0; }

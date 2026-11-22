@@ -1,0 +1,130 @@
+@page "/targets"
+@rendermode InteractiveServer
+@inject ITargets Targets
+
+<PageTitle>NutriLog · Targets</PageTitle>
+
+<h1>Targets</h1>
+
+@if (rows is not null)
+{
+    <form class="card targets-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <p class="muted note">
+            Per day. Fill in a minimum, a maximum or both; leave both empty for no target.
+            On a run day, its calories are added to the energy and carbohydrate grows in proportion.
+        </p>
+        <div class="target-head" aria-hidden="true"><span></span><span>Min</span><span>Max</span></div>
+        @foreach (var row in rows.Where(r => Headline.Contains(r.Nutrient.Id)))
+        {
+            @Row(row)
+        }
+        <label class="per-km">
+            Extra protein per km run (g)
+            <input type="number" inputmode="decimal" step="any" min="0" @bind="proteinPerKm" />
+        </label>
+
+        <details>
+            <summary>More nutrients</summary>
+            @foreach (var group in rows.Where(r => !Headline.Contains(r.Nutrient.Id)).GroupBy(r => r.Nutrient.Group))
+            {
+                <h2 class="target-group">@(group.Key == NutrientGroup.FattyAcids ? "Fatty acids" : group.Key.ToString())</h2>
+                @foreach (var row in group)
+                {
+                    @Row(row)
+                }
+            }
+        </details>
+
+        @if (error is not null)
+        {
+            <p class="form-error" role="alert">@error</p>
+        }
+        @if (saved)
+        {
+            <p class="saved" role="status">Saved.</p>
+        }
+        <div class="form-actions">
+            <button type="submit" class="button primary" disabled="@busy">Save</button>
+        </div>
+    </form>
+}
+
+@code {
+    public static readonly IReadOnlyList<string> Headline =
+        [Nutrients.Energy, Nutrients.Protein, Nutrients.Carbohydrate, Nutrients.Fat, Nutrients.Fibre];
+
+    List<TargetInput>? rows;
+    double? proteinPerKm;
+    string? error;
+    bool saved;
+    bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var targets = (await Targets.GetAsync()).ToDictionary(t => t.NutrientId);
+        rows = Nutrients.All.Select(n => targets.TryGetValue(n.Id, out var t)
+            ? new TargetInput(n) { Minimum = t.Minimum, Maximum = t.Maximum }
+            : new TargetInput(n)).ToList();
+        proteinPerKm = targets.TryGetValue(Nutrients.Protein, out var protein) && protein.ExtraPerRunKm > 0 ? protein.ExtraPerRunKm : null;
+    }
+
+    RenderFragment Row(TargetInput row) =>
+        @<div class="target-row">
+            <span class="target-name">@row.Nutrient.Name <span class="muted">@row.Nutrient.Unit</span></span>
+            <input type="number" aria-label="@($"{row.Nutrient.Name} minimum")" inputmode="decimal" step="any" min="0" @bind="row.Minimum" />
+            <input type="number" aria-label="@($"{row.Nutrient.Name} maximum")" inputmode="decimal" step="any" min="0" @bind="row.Maximum" />
+        </div>;
+
+    async Task SaveAsync()
+    {
+        saved = false;
+        error = Check();
+        if (error is not null)
+            return;
+        var targets = rows!.Where(r => r.Minimum is not null || r.Maximum is not null).Select(r => new NutrientTarget
+        {
+            NutrientId = r.Nutrient.Id,
+            Minimum = r.Minimum,
+            Maximum = r.Maximum,
+            ExtraPerRunKm = r.Nutrient.Id == Nutrients.Protein ? proteinPerKm ?? 0 : 0
+        }).ToList();
+        busy = true;
+        try
+        {
+            await Targets.SaveAsync(targets);
+            saved = true;
+        }
+        catch (ArgumentException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    string? Check()
+    {
+        foreach (var row in rows!)
+        {
+            if (row.Minimum < 0 || row.Maximum < 0)
+                return $"{row.Nutrient.Name}: targets can't be negative.";
+            if (row.Minimum > row.Maximum)
+                return $"{row.Nutrient.Name}: the minimum is above the maximum.";
+        }
+        if (proteinPerKm < 0)
+            return "Extra protein per km can't be negative.";
+        var protein = rows!.First(r => r.Nutrient.Id == Nutrients.Protein);
+        if (proteinPerKm > 0 && protein.Minimum is null && protein.Maximum is null)
+            return "Extra protein per km needs a protein target to add to.";
+        return null;
+    }
+
+    sealed class TargetInput(Nutrient nutrient)
+    {
+        public Nutrient Nutrient { get; } = nutrient;
+        public double? Minimum { get; set; }
+        public double? Maximum { get; set; }
+    }
+}
