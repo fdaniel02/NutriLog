@@ -1,12 +1,25 @@
 @page "/entry/{EntryId:int}"
 @rendermode InteractiveServer
 @inject IDiary Diary
+@inject IRecipes Recipes
 @inject Clock Clock
 @inject NavigationManager Navigation
 
 <PageTitle>NutriLog · Edit entry</PageTitle>
 
-@if (entry is null)
+@if (recipeEntry is not null)
+{
+    <nav class="back-nav">
+        <a href="@DiaryUrls.Day(recipeEntry.Date)">‹ @DiaryUrls.DayTitle(recipeEntry.Date, Clock.Today)</a>
+    </nav>
+    <h1>Edit entry</h1>
+    <ServingsForm Name="@recipeEntry.RecipeName" PerServing="recipeEntry.PerServing" InitialServings="recipeEntry.Servings"
+                  InitialMeal="recipeEntry.Meal" SubmitLabel="Save" OnSubmit="SaveRecipeAsync">
+        <button type="button" class="button danger" @onclick="DeleteAsync">Delete</button>
+    </ServingsForm>
+    <p class="muted note">The nutrients are the recipe's when it was logged; a later change to the recipe doesn't change them.</p>
+}
+else if (entry is null)
 {
     @if (loaded)
     {
@@ -30,11 +43,13 @@ else
     public int EntryId { get; set; }
 
     EntryDetails? entry;
+    RecipeEntryDetails? recipeEntry;
     bool loaded;
 
     protected override async Task OnParametersSetAsync()
     {
         entry = await Diary.GetEntryAsync(EntryId);
+        recipeEntry = entry is null ? await Recipes.GetEntryAsync(EntryId) : null;
         loaded = true;
     }
 
@@ -44,9 +59,16 @@ else
         Navigation.NavigateTo(DiaryUrls.Day(entry!.Date));
     }
 
+    async Task SaveRecipeAsync((Meal Meal, double Servings) input)
+    {
+        await Recipes.UpdateEntryAsync(EntryId, input.Meal, input.Servings);
+        Navigation.NavigateTo(DiaryUrls.Day(recipeEntry!.Date));
+    }
+
     async Task DeleteAsync()
     {
+        var date = entry?.Date ?? recipeEntry!.Date;
         await Diary.DeleteEntryAsync(EntryId);
-        Navigation.NavigateTo(DiaryUrls.Day(entry!.Date));
+        Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 }

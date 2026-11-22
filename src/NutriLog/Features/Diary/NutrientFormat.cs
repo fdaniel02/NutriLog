@@ -15,6 +15,12 @@ public static class NutrientFormat
         _ => Amount(total.Amount)
     };
 
+    public static string Servings(double servings)
+    {
+        var amount = Amount(servings);
+        return amount == "1" ? "1 serving" : $"{amount} servings";
+    }
+
     public static string WithUnit(NutrientTotal total, string unit) =>
         total.Unknown ? "?" : $"{Total(total)} {unit}";
 }

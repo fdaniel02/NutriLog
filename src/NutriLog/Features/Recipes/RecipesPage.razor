@@ -1,0 +1,51 @@
+@page "/recipes"
+@rendermode InteractiveServer
+@inject IRecipes Recipes
+
+<PageTitle>NutriLog · Recipes</PageTitle>
+
+<h1>Recipes</h1>
+
+<section class="card search">
+    <input type="search" class="search-input" placeholder="Search recipes" aria-label="Search recipes" autocomplete="off"
+           @bind="query" @bind:event="oninput" @bind:after="SearchAsync" />
+    @if (recipes is { Count: > 0 })
+    {
+        <ul class="matches">
+            @foreach (var recipe in recipes)
+            {
+                <li>
+                    <a href="@RecipeUrls.Edit(recipe.Id)">
+                        <span class="match-name">@recipe.Name</span>
+                        <span class="match-details muted">@RecipeDetailsText(recipe)</span>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+    else if (recipes is not null)
+    {
+        <p class="muted search-hint">@(string.IsNullOrWhiteSpace(query) ? "No recipes yet." : "No recipe found.")</p>
+    }
+    <a class="add-link" href="@RecipeUrls.New">+ New recipe</a>
+</section>
+
+@code {
+    string query = "";
+    IReadOnlyList<RecipeMatch>? recipes;
+    int searchVersion;
+
+    protected override Task OnInitializedAsync() => SearchAsync();
+
+    async Task SearchAsync()
+    {
+        // Results of an older, slower search must not replace those of the latest keystroke.
+        var version = ++searchVersion;
+        var found = await Recipes.SearchAsync(query);
+        if (version == searchVersion)
+            recipes = found;
+    }
+
+    public static string RecipeDetailsText(RecipeMatch recipe) =>
+        $"{NutrientFormat.Servings(recipe.Servings)} · {NutrientFormat.WithUnit(recipe.EnergyPerServing, "kcal")} per serving";
+}

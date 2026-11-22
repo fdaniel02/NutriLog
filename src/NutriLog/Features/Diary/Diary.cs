@@ -26,13 +26,19 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var entries = await db.DiaryEntries.AsNoTracking()
-            .Where(e => e.Date == date && e.FoodId != null)
+            .Where(e => e.Date == date)
+            .Include(e => e.Nutrients)
             .OrderBy(e => e.CreatedUtc).ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
-        var foods = await LoadFoodsAsync(db, entries.Select(e => e.FoodId!.Value).Distinct().ToList(), cancellationToken);
+        var foods = await LoadFoodsAsync(db, entries.Where(e => e.FoodId != null).Select(e => e.FoodId!.Value).Distinct().ToList(), cancellationToken);
+        var recipeIds = entries.Where(e => e.RecipeId != null).Select(e => e.RecipeId!.Value).Distinct().ToList();
+        var recipeNames = await db.Recipes.Where(r => recipeIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.Name, cancellationToken);
 
         var items = entries.Select(e =>
         {
+            if (e.RecipeId is { } recipeId)
+                return new DiaryItem(e.Id, e.Meal, recipeNames[recipeId], NutrientFormat.Servings(e.Quantity),
+                    NutrientTotals.ForServings(Recipes.Recipes.PerServing(e), e.Quantity));
             var food = foods[e.FoodId!.Value];
             var amount = AmountOf(e);
             return new DiaryItem(e.Id, e.Meal, food.Name, food.Describe(amount), food.Nutrients(amount));
@@ -158,17 +164,21 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
             .OrderBy(e => e.CreatedUtc).ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
         var now = time.GetUtcNow().UtcDateTime;
-        db.DiaryEntries.AddRange(source.Select(e => new DiaryEntry
-        {
-            Date = to,
-            Meal = e.Meal,
-            FoodId = e.FoodId,
-            RecipeId = e.RecipeId,
-            Quantity = e.Quantity,
-            QuantityUnit = e.QuantityUnit,
-            PortionId = e.PortionId,
-            CreatedUtc = now
-        }));
+        // A copy is a new entry, so a recipe counts as it is now, not as it was on the day copied from.
+        var snapshots = await Recipes.Recipes.SnapshotsAsync(db,
+            source.Where(e => e.RecipeId != null).Select(e => e.RecipeId!.Value).Distinct().ToList(), cancellationToken);
+        db.DiaryEntries.AddRange(source.Select(e => e.RecipeId is { } recipeId
+            ? Recipes.Recipes.NewEntry(to, e.Meal, recipeId, e.Quantity, snapshots[recipeId], now)
+            : new DiaryEntry
+            {
+                Date = to,
+                Meal = e.Meal,
+                FoodId = e.FoodId,
+                Quantity = e.Quantity,
+                QuantityUnit = e.QuantityUnit,
+                PortionId = e.PortionId,
+                CreatedUtc = now
+            }));
         await db.SaveChangesAsync(cancellationToken);
         return source.Count;
     }

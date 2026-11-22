@@ -1,6 +1,7 @@
 @page "/add"
 @rendermode InteractiveServer
 @inject IDiary Diary
+@inject IRecipes Recipes
 @inject Clock Clock
 @inject NavigationManager Navigation
 
@@ -11,7 +12,13 @@
 </nav>
 <h1>Add to @meal</h1>
 
-@if (food is not null)
+@if (recipe is not null)
+{
+    <ServingsForm Name="@recipe.Name" PerServing="recipe.Snapshot" InitialMeal="meal" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
+        <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
+    </ServingsForm>
+}
+else if (food is not null)
 {
     <AmountForm Food="food" InitialMeal="meal" SubmitLabel="Add" OnSubmit="AddAsync">
         <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
@@ -22,6 +29,21 @@ else
     <section class="card search">
         <input type="search" class="search-input" placeholder="Search foods" aria-label="Search foods" autocomplete="off"
                @bind="query" @bind:event="oninput" @bind:after="SearchAsync" />
+        @if (recipeMatches is { Count: > 0 })
+        {
+            <p class="muted search-hint">Recipes</p>
+            <ul class="matches recipe-matches">
+                @foreach (var match in recipeMatches)
+                {
+                    <li>
+                        <a href="@RecipeUrls.AddToDay(date, meal, match.Id)">
+                            <span class="match-name">@match.Name</span>
+                            <span class="match-details muted">Recipe · @NutrientFormat.WithUnit(match.EnergyPerServing, "kcal")/serving</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
         @if (matches is { Count: > 0 })
         {
             @if (string.IsNullOrWhiteSpace(query))
@@ -58,9 +80,14 @@ else
     [SupplyParameterFromQuery(Name = "food")]
     public int? FoodId { get; set; }
 
+    [SupplyParameterFromQuery(Name = "recipe")]
+    public int? RecipeId { get; set; }
+
     DateOnly date;
     Meal meal;
     FoodChoice? food;
+    RecipeDetails? recipe;
+    IReadOnlyList<RecipeMatch>? recipeMatches;
     string query = "";
     IReadOnlyList<FoodMatch>? matches;
     int searchVersion;
@@ -70,7 +97,8 @@ else
         date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
         meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
         food = FoodId is { } id ? await Diary.GetFoodAsync(id) : null;
-        if (food is null && matches is null)
+        recipe = RecipeId is { } recipeId ? await Recipes.GetAsync(recipeId) : null;
+        if (food is null && recipe is null && matches is null)
             await SearchAsync();
     }
 
@@ -79,13 +107,21 @@ else
         // Results of an older, slower search must not replace those of the latest keystroke.
         var version = ++searchVersion;
         var found = await Diary.SearchFoodsAsync(query);
+        // Recipes only for a query, so the recent foods stay first when the box is empty.
+        IReadOnlyList<RecipeMatch> foundRecipes = string.IsNullOrWhiteSpace(query) ? [] : await Recipes.SearchAsync(query);
         if (version == searchVersion)
-            matches = found;
+            (matches, recipeMatches) = (found, foundRecipes);
     }
 
     async Task AddAsync((Meal Meal, EntryAmount Amount) input)
     {
         await Diary.AddEntryAsync(date, input.Meal, food!.Id, input.Amount);
+        Navigation.NavigateTo(DiaryUrls.Day(date));
+    }
+
+    async Task AddRecipeAsync((Meal Meal, double Servings) input)
+    {
+        await Recipes.LogAsync(date, input.Meal, recipe!.Id, input.Servings);
         Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 

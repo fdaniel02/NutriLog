@@ -145,6 +145,30 @@ namespace NutriLog.Migrations
                         });
                 });
 
+            modelBuilder.Entity("NutriLog.Data.DiaryEntryNutrient", b =>
+                {
+                    b.Property<int>("DiaryEntryId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NutrientId")
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<bool>("Complete")
+                        .HasColumnType("boolean");
+
+                    b.Property<double>("PerServing")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("DiaryEntryId", "NutrientId");
+
+                    b.HasIndex("NutrientId");
+
+                    b.ToTable("DiaryEntryNutrients", t =>
+                        {
+                            t.HasCheckConstraint("CK_DiaryEntryNutrients_PerServing", "\"PerServing\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("NutriLog.Data.Food", b =>
                 {
                     b.Property<int>("Id")
@@ -620,6 +644,21 @@ namespace NutriLog.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("NutriLog.Data.DiaryEntryNutrient", b =>
+                {
+                    b.HasOne("NutriLog.Data.DiaryEntry", null)
+                        .WithMany("Nutrients")
+                        .HasForeignKey("DiaryEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("NutriLog.Data.Nutrient", null)
+                        .WithMany()
+                        .HasForeignKey("NutrientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("NutriLog.Data.FoodNutrient", b =>
                 {
                     b.HasOne("NutriLog.Data.Food", null)
@@ -657,6 +696,11 @@ namespace NutriLog.Migrations
                         .HasForeignKey("RecipeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("NutriLog.Data.DiaryEntry", b =>
+                {
+                    b.Navigation("Nutrients");
                 });
 
             modelBuilder.Entity("NutriLog.Data.Food", b =>

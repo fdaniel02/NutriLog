@@ -31,6 +31,18 @@ public sealed class NutrientTotals
             ? new NutrientTotal(per100 * grams / 100, 1, 0)
             : new NutrientTotal(0, 0, 1)));
 
+    // A recipe entry logged with its nutrients per serving: one entry, complete or not per nutrient.
+    public static NutrientTotals ForServings(IReadOnlyDictionary<string, (double PerServing, bool Complete)> perServing, double servings) =>
+        new(Data.Nutrients.All.ToDictionary(n => n.Id, n => ForServing(perServing, n.Id, servings)));
+
+    static NutrientTotal ForServing(IReadOnlyDictionary<string, (double PerServing, bool Complete)> perServing, string nutrientId, double servings)
+    {
+        if (!perServing.TryGetValue(nutrientId, out var value))
+            return new NutrientTotal(0, 0, 1);
+        var missing = value.Complete ? 0 : 1;
+        return new NutrientTotal(value.PerServing * servings, 1, missing);
+    }
+
     public static NutrientTotals Sum(IEnumerable<NutrientTotals> parts)
     {
         var sum = new Dictionary<string, NutrientTotal>();

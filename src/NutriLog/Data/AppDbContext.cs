@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Recipe> Recipes => Set<Recipe>();
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
     public DbSet<DiaryEntry> DiaryEntries => Set<DiaryEntry>();
+    public DbSet<DiaryEntryNutrient> DiaryEntryNutrients => Set<DiaryEntryNutrient>();
     public DbSet<DataImport> DataImports => Set<DataImport>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -84,6 +85,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne<Recipe>().WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Portion>().WithMany().HasForeignKey(x => new { x.PortionId, x.FoodId })
                 .HasPrincipalKey(x => new { x.Id, x.FoodId }).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Nutrients).WithOne().HasForeignKey(x => x.DiaryEntryId).OnDelete(DeleteBehavior.Cascade);
             e.ToTable(t =>
             {
                 t.HasCheckConstraint("CK_DiaryEntries_FoodOrRecipe", "(\"FoodId\" IS NULL) <> (\"RecipeId\" IS NULL)");
@@ -91,6 +93,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 t.HasCheckConstraint("CK_DiaryEntries_Servings", "(\"QuantityUnit\" = 'Servings') = (\"RecipeId\" IS NOT NULL)");
                 t.HasCheckConstraint("CK_DiaryEntries_Quantity", "\"Quantity\" > 0");
             });
+        });
+
+        modelBuilder.Entity<DiaryEntryNutrient>(e =>
+        {
+            e.HasKey(x => new { x.DiaryEntryId, x.NutrientId });
+            e.HasOne<Nutrient>().WithMany().HasForeignKey(x => x.NutrientId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_DiaryEntryNutrients_PerServing", "\"PerServing\" >= 0"));
         });
 
         modelBuilder.Entity<DataImport>(e =>
