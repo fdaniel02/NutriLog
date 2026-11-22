@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NutriLog/NutriLog.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NutriLog.Tests/NutriLog.Tests.csproj" />
+  </Folder>
+</Solution>
