@@ -1,0 +1,53 @@
+<section class="card summary" aria-label="@Label">
+    <div class="summary-energy">
+        <span class="summary-value">@NutrientFormat.Total(Totals[Nutrients.Energy])</span>
+        <span class="muted">kcal</span>
+    </div>
+    <dl class="summary-macros">
+        @foreach (var id in Headline)
+        {
+            var nutrient = ById[id];
+            <div>
+                <dt>@nutrient.Name</dt>
+                <dd>@NutrientFormat.WithUnit(Totals[id], nutrient.Unit)</dd>
+            </div>
+        }
+    </dl>
+    <details class="all-nutrients">
+        <summary>All nutrients</summary>
+        @foreach (var group in Nutrients.All.Where(n => !Headline.Contains(n.Id) && n.Id != Nutrients.Energy).GroupBy(n => n.Group))
+        {
+            <table class="nutrient-table">
+                <caption>@GroupName(group.Key)</caption>
+                <tbody>
+                    @foreach (var nutrient in group)
+                    {
+                        <tr>
+                            <th scope="row">@nutrient.Name</th>
+                            <td>@NutrientFormat.WithUnit(Totals[nutrient.Id], nutrient.Unit)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <p class="muted note">≥: some foods have no value for it; ?: none has.</p>
+    </details>
+</section>
+
+@code {
+    public static readonly IReadOnlyList<string> Headline = [Nutrients.Protein, Nutrients.Carbohydrate, Nutrients.Fat, Nutrients.Fibre];
+
+    static readonly Dictionary<string, Nutrient> ById = Nutrients.All.ToDictionary(n => n.Id);
+
+    [Parameter, EditorRequired]
+    public NutrientTotals Totals { get; set; } = NutrientTotals.Empty;
+
+    [Parameter]
+    public string Label { get; set; } = "Total";
+
+    static string GroupName(NutrientGroup group) => group switch
+    {
+        NutrientGroup.FattyAcids => "Fatty acids",
+        _ => group.ToString()
+    };
+}

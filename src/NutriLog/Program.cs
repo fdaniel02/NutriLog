@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using NutriLog;
 using NutriLog.Components;
 using NutriLog.Data;
+using NutriLog.Features.Diary;
+using NutriLog.Features.Foods;
 using NutriLog.Features.Sources;
 using NutriLog.Import;
 
@@ -39,6 +41,14 @@ builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 builder.Services.AddAppTelemetry(builder.Configuration);
 builder.Services.AddSingleton<DatabaseMigrator>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton(services =>
+{
+    var timeZoneId = builder.Configuration["TimeZone"]
+        ?? throw new InvalidOperationException("Setting 'TimeZone' is missing (an IANA id, e.g. 'Europe/Amsterdam').");
+    return new Clock(TimeZoneInfo.FindSystemTimeZoneById(timeZoneId), services.GetRequiredService<TimeProvider>());
+});
+builder.Services.AddTransient<IDiary, Diary>();
+builder.Services.AddTransient<IFoods, Foods>();
 builder.Services.AddTransient<ISourceQueries, SourceQueries>();
 builder.Services.AddTransient<FoodImporter>();
 builder.Services.AddTransient<ImportCommand>();
