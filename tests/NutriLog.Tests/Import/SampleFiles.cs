@@ -11,6 +11,12 @@ public static class SampleFiles
     // Nutrient columns the import ignores, as in NEVO's file.
     static readonly string[] OtherNevoCodes = ["WATER", "NIAEQ"];
 
+    static readonly string[] NevoTextColumns =
+    [
+        "NEVO-versie/NEVO-version", "Voedingsmiddelgroep", "Food group", "NEVO-code",
+        "Voedingsmiddelnaam/Dutch food name", "Engelse naam/Food name", "Synoniem", "Hoeveelheid/Quantity",
+    ];
+
     public sealed record NevoRow(string Code, string Name, string NameNl, string Quantity, Dictionary<string, string> Values);
 
     // A header like NEVO's: text columns, then "CODE (unit)" per nutrient, including ones the import ignores.
@@ -19,9 +25,7 @@ public static class SampleFiles
     public static MemoryStream Nevo(string version, params NevoRow[] rows)
     {
         var nutrientCodes = NevoReader.NutrientCodes.Keys.Concat(OtherNevoCodes).ToList();
-        var header = new[] { "NEVO-versie/NEVO-version", "Voedingsmiddelgroep", "Food group", "NEVO-code",
-                "Voedingsmiddelnaam/Dutch food name", "Engelse naam/Food name", "Synoniem", "Hoeveelheid/Quantity" }
-            .Concat(nutrientCodes.Select(c => $"{c} ({(c == "ENERCC" ? "kcal" : "g")})"));
+        var header = NevoTextColumns.Concat(nutrientCodes.Select(c => $"{c} ({(c == "ENERCC" ? "kcal" : "g")})"));
         var lines = new List<string> { string.Join('|', header.Select(h => $"\"{h}\"")) };
         foreach (var row in rows)
         {
