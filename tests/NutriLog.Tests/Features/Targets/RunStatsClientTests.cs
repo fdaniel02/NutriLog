@@ -110,13 +110,20 @@ public class RunStatsClientTests
     }
 
     [Theory]
-    [InlineData(null, "http://runstats.runstats.svc/")]
-    [InlineData("", "http://runstats.runstats.svc/")]
-    [InlineData("http://localhost:5310", "http://localhost:5310/")]
-    [InlineData("http://localhost:5310/", "http://localhost:5310/")]
-    public void The_base_address_ends_with_a_slash_so_paths_are_relative_to_it(string? configured, string expected)
+    [InlineData("http://localhost:5310")]
+    [InlineData("http://localhost:5310/")]
+    public void The_base_address_ends_with_a_slash_so_paths_are_relative_to_it(string configured)
     {
-        Assert.Equal(new Uri(expected), RunStatsClient.BaseAddress(configured));
+        Assert.Equal(new Uri("http://localhost:5310/"), RunStatsClient.BaseAddress(configured));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    public void A_missing_base_address_is_an_error(string? configured)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => RunStatsClient.BaseAddress(configured));
+        Assert.Contains("RunStats:BaseUrl", error.Message);
     }
 
     sealed class FakeHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : HttpMessageHandler

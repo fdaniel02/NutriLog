@@ -12,7 +12,6 @@ public interface IRunStats
 
 public sealed class RunStatsClient(HttpClient http, ILogger<RunStatsClient> logger) : IRunStats
 {
-    public const string DefaultBaseUrl = "http://runstats.runstats.svc/";
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
 
     public async Task<RunDay?> GetDayAsync(DateOnly date, CancellationToken cancellationToken = default)
@@ -33,8 +32,11 @@ public sealed class RunStatsClient(HttpClient http, ILogger<RunStatsClient> logg
         }
     }
 
+    // Without the trailing slash, the relative request path would replace the base address' last segment.
     public static Uri BaseAddress(string? configured) =>
-        new(string.IsNullOrWhiteSpace(configured) ? DefaultBaseUrl : configured.TrimEnd('/') + "/");
+        string.IsNullOrWhiteSpace(configured)
+            ? throw new InvalidOperationException("Setting 'RunStats:BaseUrl' is missing (e.g. 'http://runstats.runstats.svc').")
+            : new Uri(configured.TrimEnd('/') + "/");
 
     // Only what the targets use of RunStats' GET /api/runs rows.
     sealed record RunRow(double DistanceMeters, double? Calories);

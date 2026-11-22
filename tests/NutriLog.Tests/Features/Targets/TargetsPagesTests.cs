@@ -119,7 +119,7 @@ public class TargetsPagesTests(PostgresFixture postgres) : BunitContext
         Assert.Equal(["target", "under"], energy.ClassList);
         Assert.Equal("under, target 2900–3100", Normalized(energy.TextContent));
         var macros = page.FindAll(".summary-macros .target");
-        Assert.Equal(["within", "over"], macros.Select(t => t.ClassList.Last()));
+        Assert.Equal(["target within", "target over"], macros.Select(t => t.ClassName));
         Assert.Equal("≥ 10", Normalized(page.Find(".summary-macros .within").LastChild!.TextContent));
         // The bread has no sodium value.
         var sodium = page.FindAll(".nutrient-table .target").Single();
