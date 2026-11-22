@@ -8,6 +8,9 @@ namespace NutriLog.Tests.Import;
 // Files in the sources' formats with made-up foods and values: NEVO's conditions don't allow passing its data on.
 public static class SampleFiles
 {
+    // Nutrient columns the import ignores, as in NEVO's file.
+    static readonly string[] OtherNevoCodes = ["WATER", "NIAEQ"];
+
     public sealed record NevoRow(string Code, string Name, string NameNl, string Quantity, Dictionary<string, string> Values);
 
     // A header like NEVO's: text columns, then "CODE (unit)" per nutrient, including ones the import ignores.
@@ -15,7 +18,7 @@ public static class SampleFiles
 
     public static MemoryStream Nevo(string version, params NevoRow[] rows)
     {
-        var nutrientCodes = NevoReader.NutrientCodes.Keys.Concat(["WATER", "NIAEQ"]).ToList();
+        var nutrientCodes = NevoReader.NutrientCodes.Keys.Concat(OtherNevoCodes).ToList();
         var header = new[] { "NEVO-versie/NEVO-version", "Voedingsmiddelgroep", "Food group", "NEVO-code",
                 "Voedingsmiddelnaam/Dutch food name", "Engelse naam/Food name", "Synoniem", "Hoeveelheid/Quantity" }
             .Concat(nutrientCodes.Select(c => $"{c} ({(c == "ENERCC" ? "kcal" : "g")})"));

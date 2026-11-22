@@ -116,7 +116,7 @@ public sealed class FoodImporter(IDbContextFactory<AppDbContext> dbFactory, Time
                 db.FoodNutrients.Remove(nutrient);
                 changed = true;
             }
-            else if (nutrient.Amount != amount)
+            else if (Differs(nutrient.Amount, amount))
             {
                 nutrient.Amount = amount;
                 changed = true;
@@ -136,7 +136,7 @@ public sealed class FoodImporter(IDbContextFactory<AppDbContext> dbFactory, Time
         {
             if (importedPortions.Remove(portion.Name, out var match))
             {
-                if (portion.Grams != match.Grams)
+                if (Differs(portion.Grams, match.Grams))
                 {
                     portion.Grams = match.Grams;
                     changed = true;
@@ -157,4 +157,7 @@ public sealed class FoodImporter(IDbContextFactory<AppDbContext> dbFactory, Time
 
         return changed;
     }
+
+    // The values come from the same text each time, so any real change is far larger than this.
+    static bool Differs(double stored, double imported) => Math.Abs(stored - imported) > 1e-9;
 }

@@ -29,8 +29,9 @@ public sealed class ImportCommand(FoodImporter importer, TimeProvider time, ILog
             await using var file = File.OpenRead(path);
             var data = source == "nevo" ? NevoReader.Read(file) : UsdaReader.Read(file, Path.GetFileName(path));
             var result = await importer.ImportAsync(data, cancellationToken);
+            var seconds = time.GetElapsedTime(started).TotalSeconds;
             logger.ImportSucceeded(data.Source, data.Version, result.Added, result.Updated, result.Unchanged, result.Removed,
-                result.Kept, time.GetElapsedTime(started).TotalSeconds);
+                result.Kept, seconds);
             return Succeeded;
         }
         // Problems with the file itself: a message is enough, a stack trace wouldn't help.

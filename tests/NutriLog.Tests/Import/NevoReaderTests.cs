@@ -64,20 +64,24 @@ public class NevoReaderTests
         Assert.Null(food.NameNl);
     }
 
-    public static TheoryData<Func<MemoryStream>, string> BadFiles => new()
-    {
-        { () => new MemoryStream(), "empty" },
-        { () => new MemoryStream(Encoding.UTF8.GetBytes("\"NEVO-code\"|\"Something\"\r\n")), "NEVO-versie/NEVO-version" },
-        { () => Nevo(Row(quantity: "per stuk")), "per stuk" },
-        { () => Nevo(Row(values: new() { ["PROT"] = "veel" })), "veel" },
-        { () => Nevo("NEVO-Online", Row()), "version" },
-    };
-
     [Theory]
-    [MemberData(nameof(BadFiles))]
-    public void A_file_it_cannot_read_says_why(Func<MemoryStream> file, string mentioned)
+    [InlineData("empty file", "empty")]
+    [InlineData("another file", "NEVO-versie/NEVO-version")]
+    [InlineData("unknown quantity", "per stuk")]
+    [InlineData("text for a number", "veel")]
+    [InlineData("no version number", "version")]
+    public void A_file_it_cannot_read_says_why(string problem, string mentioned)
     {
-        var error = Assert.Throws<ImportFormatException>(() => NevoReader.Read(file()));
+        var file = problem switch
+        {
+            "empty file" => new MemoryStream(),
+            "another file" => new MemoryStream(Encoding.UTF8.GetBytes("\"NEVO-code\"|\"Something\"\r\n")),
+            "unknown quantity" => Nevo(Row(quantity: "per stuk")),
+            "text for a number" => Nevo(Row(values: new() { ["PROT"] = "veel" })),
+            _ => Nevo("NEVO-Online", Row()),
+        };
+
+        var error = Assert.Throws<ImportFormatException>(() => NevoReader.Read(file));
 
         Assert.Contains(mentioned, error.Message);
     }
