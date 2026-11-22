@@ -98,17 +98,18 @@ public class BarcodeLookupTests(PostgresFixture postgres)
         Assert.False(await db.Foods.AnyAsync(Token));
     }
 
-    public static TheoryData<Exception> Failures => new()
-    {
-        new HttpRequestException("refused"),
-        new System.Text.Json.JsonException("bad json"),
-        new TaskCanceledException("timeout")
-    };
-
     [Theory]
-    [MemberData(nameof(Failures))]
-    public async Task Open_food_facts_failing_is_unavailable_and_logged(Exception failure)
+    [InlineData("refused")]
+    [InlineData("bad json")]
+    [InlineData("timeout")]
+    public async Task Open_food_facts_failing_is_unavailable_and_logged(string kind)
     {
+        Exception failure = kind switch
+        {
+            "refused" => new HttpRequestException(kind),
+            "bad json" => new System.Text.Json.JsonException(kind),
+            _ => new TaskCanceledException(kind)
+        };
         var logger = new FakeLogger<BarcodeLookup>();
         var (lookup, _) = await CreateAsync(postgres, new FakeOpenFoodFacts(_ => throw failure), logger);
 

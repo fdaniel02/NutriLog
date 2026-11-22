@@ -17,7 +17,6 @@ public interface IOpenFoodFacts
 
 public sealed class OpenFoodFacts(HttpClient http) : IOpenFoodFacts
 {
-    public const string DefaultBaseUrl = "https://world.openfoodfacts.org/";
     // Open Food Facts asks for a User-Agent naming the app; a contact address is optional and stays out.
     public const string UserAgent = "NutriLog/1.0 (self-hosted food diary)";
 
@@ -41,6 +40,7 @@ public static class OffMapping
     const double MilliPerGram = 1_000;
     const double MicroPerGram = 1_000_000;
     const double KcalPerKj = 1 / 4.184;
+    const string Sodium = "sodium";
 
     // Open Food Facts states every nutrient but energy in grams per 100 g (or ml); ours are in the unit of Nutrients.All.
     // Alcohol is left out: Open Food Facts gives it in % vol, not grams.
@@ -67,7 +67,7 @@ public static class OffMapping
         ("vitamin-b12", "vitamin_b12", MicroPerGram),
         ("vitamin-b9", "folate", MicroPerGram),
         ("vitamin-c", "vitamin_c", MilliPerGram),
-        ("sodium", "sodium", MilliPerGram),
+        ("sodium", Sodium, MilliPerGram),
         ("potassium", "potassium", MilliPerGram),
         ("calcium", "calcium", MilliPerGram),
         ("magnesium", "magnesium", MilliPerGram),
@@ -106,8 +106,8 @@ public static class OffMapping
                 per100[id] = amount * factor;
         }
         // Labels state salt; Open Food Facts usually fills sodium from it, but not always.
-        if (!per100.ContainsKey("sodium") && Value(nutriments, "salt") is { } salt)
-            per100["sodium"] = salt * 400;
+        if (!per100.ContainsKey(Sodium) && Value(nutriments, "salt") is { } salt)
+            per100[Sodium] = salt * 400;
         return per100;
     }
 

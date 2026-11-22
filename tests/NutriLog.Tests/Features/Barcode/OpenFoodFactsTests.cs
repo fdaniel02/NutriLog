@@ -8,7 +8,7 @@ public class OpenFoodFactsTests
     static (OpenFoodFacts Client, OffSamples.Handler Handler) Create(HttpStatusCode status, string json)
     {
         var handler = new OffSamples.Handler(_ => OffSamples.Json(status, json));
-        return (new OpenFoodFacts(new HttpClient(handler) { BaseAddress = new Uri(OpenFoodFacts.DefaultBaseUrl) }), handler);
+        return (new OpenFoodFacts(new HttpClient(handler) { BaseAddress = new Uri("https://off.test/") }), handler);
     }
 
     [Fact]

@@ -49,7 +49,7 @@ public sealed class Foods(IDbContextFactory<AppDbContext> dbFactory, TimeProvide
     public async Task<EditableFood?> GetEditableAsync(int foodId, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var food = await db.Foods.AsNoTracking().Include(f => f.Nutrients).Include(f => f.Portions)
+        var food = await db.Foods.AsNoTracking().Include(f => f.Nutrients).Include(f => f.Portions).AsSplitQuery()
             .SingleOrDefaultAsync(f => f.Id == foodId, cancellationToken);
         if (food is null || !IsEditable(food.Source))
             return null;

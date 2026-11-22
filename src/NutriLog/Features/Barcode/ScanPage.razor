@@ -129,9 +129,9 @@
                 await module.InvokeVoidAsync("stop");
                 await module.DisposeAsync();
             }
-            // The circuit is gone when the tab closes; the browser has stopped the camera by then.
             catch (JSDisconnectedException)
             {
+                // The circuit is gone when the tab closes; the browser has stopped the camera by then.
             }
         }
         self?.Dispose();

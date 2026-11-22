@@ -62,7 +62,8 @@ builder.Services.AddHttpClient<IRunStats, RunStatsClient>(client =>
 builder.Services.AddTransient<ITargets, NutriLog.Features.Targets.Targets>();
 builder.Services.AddHttpClient<IOpenFoodFacts, OpenFoodFacts>(http =>
 {
-    http.BaseAddress = new Uri(builder.Configuration["OpenFoodFacts:BaseUrl"] ?? OpenFoodFacts.DefaultBaseUrl);
+    http.BaseAddress = new Uri(builder.Configuration["OpenFoodFacts:BaseUrl"]
+        ?? throw new InvalidOperationException("Setting 'OpenFoodFacts:BaseUrl' is missing."));
     http.DefaultRequestHeaders.UserAgent.ParseAdd(OpenFoodFacts.UserAgent);
     // A scan waits for it; past this, typing the label in is quicker.
     http.Timeout = TimeSpan.FromSeconds(10);

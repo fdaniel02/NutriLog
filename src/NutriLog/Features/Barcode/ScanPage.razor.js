@@ -1,4 +1,4 @@
-const formats = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+const formats = new Set(['ean_13', 'ean_8', 'upc_a', 'upc_e']);
 let stream;
 let timer;
 
@@ -6,7 +6,7 @@ export async function start(video, page) {
     if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
         return 'unsupported';
     }
-    const supported = (await BarcodeDetector.getSupportedFormats()).filter(f => formats.includes(f));
+    const supported = (await BarcodeDetector.getSupportedFormats()).filter(f => formats.has(f));
     if (supported.length === 0) {
         return 'unsupported';
     }
@@ -35,7 +35,7 @@ export async function start(video, page) {
         }
         timer = setTimeout(scan, 250);
     };
-    scan();
+    void scan();
     return 'started';
 }
 

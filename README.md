@@ -95,8 +95,8 @@ Packaged products come from **Open Food Facts** (ODbL), one at a time: scanning 
 [API](https://openfoodfacts.github.io/openfoodfacts-server/api/) for an unknown barcode. The product is saved as a food
 (source `Off`), so the next scan works without the API, and it can be corrected when the label differs; own and scanned
 foods can be edited, imported ones can't. A failed lookup is logged (event id 30). Once a product is saved, the footer
-shows the attribution the license asks for. `OpenFoodFacts:BaseUrl` (default `https://world.openfoodfacts.org/`)
-points the app at another instance, such as the staging server.
+shows the attribution the license asks for. `OpenFoodFacts:BaseUrl` (`https://world.openfoodfacts.org/` in
+`appsettings.json`) points the app at another instance, such as the staging server.
 
 ## Configuration
 
