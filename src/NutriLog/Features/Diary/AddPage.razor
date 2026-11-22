@@ -34,9 +34,7 @@ else
                     <li>
                         <a href="@DiaryUrls.Add(date, meal, match.Id)">
                             <span class="match-name">@match.Name</span>
-                            <span class="match-details muted">
-                                @(match.Recent ? "Recent · " : "")@SourceName(match.Source)@(match.EnergyPer100 is { } kcal ? $" · {NutrientFormat.Amount(kcal)} kcal/100 {(match.Basis == FoodBasis.Millilitres ? "ml" : "g")}" : "")
-                            </span>
+                            <span class="match-details muted">@Details(match)</span>
                         </a>
                     </li>
                 }
@@ -89,6 +87,20 @@ else
     {
         await Diary.AddEntryAsync(date, input.Meal, food!.Id, input.Amount);
         Navigation.NavigateTo(DiaryUrls.Day(date));
+    }
+
+    public static string Details(FoodMatch match)
+    {
+        var parts = new List<string>();
+        if (match.Recent)
+            parts.Add("Recent");
+        parts.Add(SourceName(match.Source));
+        if (match.EnergyPer100 is { } kcal)
+        {
+            var unit = match.Basis == FoodBasis.Millilitres ? "ml" : "g";
+            parts.Add($"{NutrientFormat.Amount(kcal)} kcal/100 {unit}");
+        }
+        return string.Join(" · ", parts);
     }
 
     public static string SourceName(FoodSource source) => source switch

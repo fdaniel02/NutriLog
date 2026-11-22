@@ -116,9 +116,10 @@
         var meal = DiaryUrls.ParseMeal(copyMeal);
         var copied = await Diary.CopyAsync(copyFrom, date, meal);
         var what = meal is null ? "" : $" from {meal}";
+        var entries = copied == 1 ? "entry" : "entries";
         copyMessage = copied == 0
             ? $"Nothing to copy{what} on {DiaryUrls.DayTitle(copyFrom, Clock.Today)}."
-            : $"Copied {copied} {(copied == 1 ? "entry" : "entries")}{what}.";
+            : $"Copied {copied} {entries}{what}.";
         day = await Diary.GetDayAsync(date);
     }
 }

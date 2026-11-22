@@ -35,20 +35,23 @@ public class FoodsTests(PostgresFixture postgres)
         Assert.Equal(("bar", 55.0, false), (food.Portions[0].Name, food.Portions[0].Grams, food.Portions[0].Imported));
     }
 
-    public static TheoryData<NewFood> Invalid => new()
+    static readonly Dictionary<string, NewFood> Invalid = new()
     {
-        new NewFood(" ", FoodBasis.Grams, new Dictionary<string, double>(), []),
-        new NewFood(new string('x', AppDbContext.MaxNameLength + 1), FoodBasis.Grams, new Dictionary<string, double>(), []),
-        new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double> { ["unobtainium"] = 1 }, []),
-        new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double> { [Nutrients.Fat] = -1 }, []),
-        new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double>(), [new NewPortion("", 10)]),
-        new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double>(), [new NewPortion("bar", 0)]),
+        ["blank name"] = new NewFood(" ", FoodBasis.Grams, new Dictionary<string, double>(), []),
+        ["long name"] = new NewFood(new string('x', AppDbContext.MaxNameLength + 1), FoodBasis.Grams, new Dictionary<string, double>(), []),
+        ["unknown nutrient"] = new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double> { ["unobtainium"] = 1 }, []),
+        ["negative amount"] = new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double> { [Nutrients.Fat] = -1 }, []),
+        ["unnamed portion"] = new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double>(), [new NewPortion("", 10)]),
+        ["empty portion"] = new NewFood("Bar", FoodBasis.Grams, new Dictionary<string, double>(), [new NewPortion("bar", 0)]),
     };
 
+    public static TheoryData<string> InvalidCases => [.. Invalid.Keys];
+
     [Theory]
-    [MemberData(nameof(Invalid))]
-    public async Task Rejects_invalid_foods(NewFood food)
+    [MemberData(nameof(InvalidCases))]
+    public async Task Rejects_invalid_foods(string invalidCase)
     {
+        var food = Invalid[invalidCase];
         var (foods, factory) = await CreateAsync(postgres);
 
         await Assert.ThrowsAsync<InvalidFoodException>(() => foods.CreateOwnAsync(food, Token));

@@ -87,9 +87,16 @@
         meal = InitialMeal;
     }
 
-    EntryAmount? Amount => quantity is { } q && q > 0 && double.IsFinite(q)
-        ? new EntryAmount(q, int.TryParse(unit, out var id) ? id : null)
-        : null;
+    EntryAmount? Amount
+    {
+        get
+        {
+            if (quantity is not { } q || q <= 0 || !double.IsFinite(q))
+                return null;
+            int? portionId = int.TryParse(unit, out var id) ? id : null;
+            return new EntryAmount(q, portionId);
+        }
+    }
 
     async Task SubmitAsync()
     {
