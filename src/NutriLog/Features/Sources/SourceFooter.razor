@@ -14,5 +14,5 @@
     IReadOnlyList<string>? lines;
 
     protected override async Task OnInitializedAsync() =>
-        lines = SourceReference.Lines(await Queries.ImportedVersionsAsync());
+        lines = SourceReference.Lines(await Queries.ImportedVersionsAsync(), await Queries.HasOpenFoodFactsAsync());
 }

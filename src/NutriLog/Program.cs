@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using NutriLog;
 using NutriLog.Components;
 using NutriLog.Data;
+using NutriLog.Features.Barcode;
 using NutriLog.Features.Diary;
 using NutriLog.Features.Foods;
 using NutriLog.Features.Recipes;
@@ -59,6 +60,14 @@ builder.Services.AddHttpClient<IRunStats, RunStatsClient>(client =>
     client.Timeout = RunStatsClient.Timeout;
 });
 builder.Services.AddTransient<ITargets, NutriLog.Features.Targets.Targets>();
+builder.Services.AddHttpClient<IOpenFoodFacts, OpenFoodFacts>(http =>
+{
+    http.BaseAddress = new Uri(builder.Configuration["OpenFoodFacts:BaseUrl"] ?? OpenFoodFacts.DefaultBaseUrl);
+    http.DefaultRequestHeaders.UserAgent.ParseAdd(OpenFoodFacts.UserAgent);
+    // A scan waits for it; past this, typing the label in is quicker.
+    http.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddTransient<IBarcodeLookup, BarcodeLookup>();
 builder.Services.AddTransient<FoodImporter>();
 builder.Services.AddTransient<ImportCommand>();
 

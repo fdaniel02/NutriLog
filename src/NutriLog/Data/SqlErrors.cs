@@ -20,4 +20,7 @@ public static class SqlErrors
         NpgsqlException => false,
         _ => true
     };
+
+    public static bool IsUniqueViolation(Exception exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 }

@@ -4,6 +4,7 @@
 @inject IRecipes Recipes
 @inject Clock Clock
 @inject NavigationManager Navigation
+@using NutriLog.Features.Barcode
 
 <PageTitle>NutriLog · Add food</PageTitle>
 
@@ -22,6 +23,10 @@ else if (food is not null)
 {
     <AmountForm Food="food" InitialMeal="meal" SubmitLabel="Add" OnSubmit="AddAsync">
         <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
+        @if (NutriLog.Features.Foods.Foods.IsEditable(food.Source))
+        {
+            <a class="button" href="@FoodUrls.Edit(food.Id, date, meal)">Edit food</a>
+        }
     </AmountForm>
 }
 else
@@ -66,6 +71,7 @@ else
         {
             <p class="muted search-hint">@(string.IsNullOrWhiteSpace(query) ? "Search for a food to add." : "No food found.")</p>
         }
+        <a class="add-link" href="@BarcodeUrls.Scan(date, meal)">+ Scan a barcode</a>
         <a class="add-link" href="@DiaryUrls.NewFood(date, meal)">+ New food from a label</a>
     </section>
 }

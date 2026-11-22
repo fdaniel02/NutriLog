@@ -1,0 +1,139 @@
+@page "/scan"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IBarcodeLookup Lookup
+@inject IJSRuntime JS
+@inject Clock Clock
+@inject NavigationManager Navigation
+
+<PageTitle>NutriLog · Scan</PageTitle>
+
+<nav class="back-nav">
+    <a href="@DiaryUrls.Add(date, meal)">‹ Add to @meal</a>
+</nav>
+<h1>Scan a barcode</h1>
+
+<section class="card scan">
+    <video @ref="video" class="scan-video @(camera == "started" ? "" : "hidden")" muted playsinline aria-label="Camera"></video>
+    @if (CameraNote is { } note)
+    {
+        <p class="muted scan-note">@note</p>
+    }
+
+    <form class="scan-form" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+        <input type="text" inputmode="numeric" autocomplete="off" aria-label="Barcode" placeholder="Barcode" maxlength="14" @bind="code" />
+        <button type="submit" class="button primary" disabled="@busy">Look up</button>
+    </form>
+
+    @switch (result?.Status)
+    {
+        case LookupStatus.Invalid:
+            <p class="form-error" role="alert">A barcode has 8, 12, 13 or 14 digits.</p>
+            break;
+        case LookupStatus.NotFound:
+            <p role="alert">Open Food Facts doesn't know @looked up.</p>
+            <a class="add-link" href="@FoodUrls.NewWithBarcode(date, meal, looked!)">+ Add it from the label</a>
+            break;
+        case LookupStatus.Unavailable:
+            <p class="form-error" role="alert">Open Food Facts can't be reached right now. Try again, or add the food from its label.</p>
+            <a class="add-link" href="@FoodUrls.NewWithBarcode(date, meal, looked!)">+ Add it from the label</a>
+            break;
+    }
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? DateText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "meal")]
+    public string? MealText { get; set; }
+
+    DateOnly date;
+    Meal meal;
+    ElementReference video;
+    IJSObjectReference? module;
+    DotNetObjectReference<ScanPage>? self;
+    // null until the camera was tried, then "started", "unsupported" or "denied" (from the JS module).
+    string? camera;
+    string code = "";
+    string? looked;
+    LookupResult? result;
+    bool busy;
+
+    string? CameraNote => camera switch
+    {
+        null => "Starting the camera…",
+        "started" => "Point the camera at the barcode.",
+        "denied" => "No access to the camera. Type the barcode instead.",
+        _ => "This browser can't scan barcodes. Type the barcode instead."
+    };
+
+    protected override void OnParametersSet()
+    {
+        date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
+        meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        try
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./" + Assets["Features/Barcode/ScanPage.razor.js"]);
+            self = DotNetObjectReference.Create(this);
+            camera = await module.InvokeAsync<string>("start", video, self);
+        }
+        catch (JSException)
+        {
+            camera = "unsupported";
+        }
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnDetected(string detected)
+    {
+        code = detected;
+        camera = "stopped";
+        await LookUpAsync();
+        StateHasChanged();
+    }
+
+    Task SubmitAsync() => LookUpAsync();
+
+    async Task LookUpAsync()
+    {
+        if (busy)
+            return;
+        busy = true;
+        try
+        {
+            looked = code.Trim();
+            result = await Lookup.LookupAsync(looked);
+            if (result is { Status: LookupStatus.Found, FoodId: { } id })
+                Navigation.NavigateTo(DiaryUrls.Add(date, meal, id));
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try
+            {
+                await module.InvokeVoidAsync("stop");
+                await module.DisposeAsync();
+            }
+            // The circuit is gone when the tab closes; the browser has stopped the camera by then.
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+        self?.Dispose();
+    }
+}

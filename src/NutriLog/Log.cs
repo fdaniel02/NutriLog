@@ -30,4 +30,7 @@ public static partial class Log
     [LoggerMessage(EventId = 20, Level = LogLevel.Warning,
         Message = "RunStats couldn't be reached for the runs of {Date}, the day shows the base targets: {ErrorType}: {ErrorMessage}")]
     public static partial void RunStatsUnavailable(this ILogger logger, string date, string errorType, string errorMessage);
+
+    [LoggerMessage(EventId = 30, Level = LogLevel.Warning, Message = "Open Food Facts lookup of {Code} failed")]
+    public static partial void OpenFoodFactsUnavailable(this ILogger logger, Exception exception, string code);
 }

@@ -26,4 +26,9 @@ public class SourceReferenceTests
     [Fact]
     public void Usda_alone_names_fooddata_central_once() =>
         Assert.Equal([SourceReference.FoodDataCentral], Lines((FoodSource.UsdaFoundation, "2026-10-29")));
+
+    [Fact]
+    public void Open_food_facts_comes_last() =>
+        Assert.Equal([SourceReference.FoodDataCentral, SourceReference.OpenFoodFacts],
+            SourceReference.Lines(new Dictionary<FoodSource, string> { [FoodSource.UsdaFoundation] = "2026-10-29" }, hasOpenFoodFacts: true));
 }
