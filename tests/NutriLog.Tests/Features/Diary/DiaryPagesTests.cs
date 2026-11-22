@@ -204,9 +204,10 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         page.Find(".portion-row input[type=number]").Change("20");
         page.Find("form").Submit();
 
+        page.WaitForAssertion(() => Assert.Contains("food=", Navigation.Uri));
         await using var db = await data.Factory.CreateDbContextAsync(Token);
         var food = await db.Foods.Include(f => f.Nutrients).Include(f => f.Portions).SingleAsync(Token);
-        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Add(Today, Meal.Snack, food.Id), Navigation.Uri));
+        Assert.EndsWith(DiaryUrls.Add(Today, Meal.Snack, food.Id), Navigation.Uri);
         Assert.Equal([(Nutrients.Energy, 440.0), ("sodium", 600.0)], food.Nutrients.OrderBy(n => n.NutrientId).Select(n => (n.NutrientId, n.Amount)));
         Assert.Equal(("3 crackers", 20.0), (food.Portions[0].Name, food.Portions[0].Grams));
     }

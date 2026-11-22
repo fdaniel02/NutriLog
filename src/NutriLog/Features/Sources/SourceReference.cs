@@ -9,7 +9,11 @@ public static class SourceReference
     public const string FoodDataCentral =
         "U.S. Department of Agriculture, Agricultural Research Service. FoodData Central, 2019. fdc.nal.usda.gov.";
 
-    public static IReadOnlyList<string> Lines(IReadOnlyDictionary<FoodSource, string> importedVersions)
+    // The Open Database License asks for this notice wherever the data is used.
+    public const string OpenFoodFacts =
+        "Product data from Open Food Facts (openfoodfacts.org), available under the Open Database License (ODbL).";
+
+    public static IReadOnlyList<string> Lines(IReadOnlyDictionary<FoodSource, string> importedVersions, bool hasOpenFoodFacts = false)
     {
         var lines = new List<string>();
         if (importedVersions.TryGetValue(FoodSource.Nevo, out var nevo))
@@ -19,6 +23,8 @@ public static class SourceReference
         }
         if (importedVersions.ContainsKey(FoodSource.UsdaFoundation) || importedVersions.ContainsKey(FoodSource.UsdaSrLegacy))
             lines.Add(FoodDataCentral);
+        if (hasOpenFoodFacts)
+            lines.Add(OpenFoodFacts);
         return lines;
     }
 }

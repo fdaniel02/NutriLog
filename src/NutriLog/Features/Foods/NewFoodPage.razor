@@ -1,17 +1,28 @@
 @page "/foods/new"
+@page "/foods/{FoodId:int}/edit"
 @rendermode InteractiveServer
 @inject IFoods Foods
 @inject Clock Clock
 @inject NavigationManager Navigation
 
-<PageTitle>NutriLog · New food</PageTitle>
+<PageTitle>NutriLog · @Title</PageTitle>
 
 <nav class="back-nav">
     <a href="@DiaryUrls.Add(date, meal)">‹ Add to @meal</a>
 </nav>
-<h1>New food</h1>
+<h1>@Title</h1>
 
+@if (FoodId is not null && !loaded)
+{
+    <p class="muted">@(missing ? "This food can't be edited: it doesn't exist or comes from an imported dataset." : "Loading…")</p>
+}
+else
+{
 <form class="card food-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    @if (barcode is not null)
+    {
+        <p class="muted food-barcode">Barcode @barcode@(source == FoodSource.Off ? " · from Open Food Facts" : "")</p>
+    }
     <label class="wide">
         Name
         <input type="text" required maxlength="@AppDbContext.MaxNameLength" @bind="name" />
@@ -55,6 +66,10 @@
 
     <fieldset class="portions">
         <legend>Portions</legend>
+        @foreach (var portion in existingPortions)
+        {
+            <p class="existing-portion">@portion.Name · @NutrientFormat.Amount(portion.Grams) @Unit</p>
+        }
         @foreach (var portion in portions)
         {
             <div class="portion-row">
@@ -74,6 +89,7 @@
         <button type="submit" class="button primary" disabled="@busy">Save and add</button>
     </div>
 </form>
+}
 
 @code {
     // Sodium is entered as salt, which is what labels in the EU state.
@@ -92,6 +108,12 @@
         public double? Grams { get; set; }
     }
 
+    [Parameter]
+    public int? FoodId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "barcode")]
+    public string? BarcodeText { get; set; }
+
     [SupplyParameterFromQuery(Name = "date")]
     public string? DateText { get; set; }
 
@@ -107,13 +129,43 @@
     readonly List<PortionInput> portions = [];
     string? error;
     bool busy;
+    string? barcode;
+    FoodSource source = FoodSource.Own;
+    IReadOnlyList<NewPortion> existingPortions = [];
+    bool loaded;
+    bool missing;
+
+    string Title => FoodId is null ? "New food" : "Edit food";
 
     string Unit => basis == FoodBasis.Millilitres ? "ml" : "g";
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
         meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
+        if (FoodId is not { } id)
+        {
+            barcode = string.IsNullOrWhiteSpace(BarcodeText) ? null : BarcodeText.Trim();
+            return;
+        }
+        if (loaded)
+            return;
+        var food = await Foods.GetEditableAsync(id);
+        if (food is null)
+        {
+            missing = true;
+            return;
+        }
+        name = food.Name;
+        basis = food.Basis;
+        barcode = food.Barcode;
+        source = food.Source;
+        existingPortions = food.Portions;
+        foreach (var (nutrientId, amount) in food.Per100)
+            values[nutrientId] = amount;
+        if (food.Per100.TryGetValue(Sodium, out var sodium))
+            salt = Math.Round(sodium / SodiumMgPerGramSalt, 3);
+        loaded = true;
     }
 
     public static Dictionary<string, double> Per100(IReadOnlyDictionary<string, double?> values, double? salt)
@@ -137,8 +189,20 @@
         busy = true;
         try
         {
-            var id = await Foods.CreateOwnAsync(new NewFood(name, basis, Per100(values, salt),
-                filled.Select(p => new NewPortion(p.Name, p.Grams!.Value)).ToList()));
+            var food = new NewFood(name, basis, Per100(values, salt),
+                filled.Select(p => new NewPortion(p.Name, p.Grams!.Value)).ToList(), barcode);
+            int id;
+            if (FoodId is { } existing)
+            {
+                if (!await Foods.UpdateAsync(existing, food))
+                {
+                    error = "This food can't be edited anymore.";
+                    return;
+                }
+                id = existing;
+            }
+            else
+                id = await Foods.CreateOwnAsync(food);
             Navigation.NavigateTo(DiaryUrls.Add(date, meal, id));
         }
         catch (InvalidFoodException ex)

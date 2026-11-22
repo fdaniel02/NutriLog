@@ -25,4 +25,20 @@ public class SourceQueriesTests(PostgresFixture postgres)
 
         Assert.Equal(new Dictionary<FoodSource, string> { [FoodSource.Nevo] = "2027/10.0", [FoodSource.UsdaSrLegacy] = "2018-04" }, versions);
     }
+
+    [Fact]
+    public async Task Knows_whether_a_food_came_from_open_food_facts()
+    {
+        var factory = await MigratedDatabase.CreateAsync(postgres);
+        var queries = new SourceQueries(factory);
+        Assert.False(await queries.HasOpenFoodFactsAsync(TestContext.Current.CancellationToken));
+
+        await using (var db = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+        {
+            db.Foods.Add(new Food { Name = "Crackers", Source = FoodSource.Off, SourceId = "87123456", Barcode = "87123456" });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(await queries.HasOpenFoodFactsAsync(TestContext.Current.CancellationToken));
+    }
 }
