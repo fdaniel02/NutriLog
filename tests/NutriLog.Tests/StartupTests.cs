@@ -1,15 +1,36 @@
 using System.Net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Extensions.Options;
+using Npgsql;
+using NutriLog.Data;
+using NutriLog.Tests.Data;
 
 namespace NutriLog.Tests;
 
+// The whole app with its production configuration, against a real PostgreSQL.
+[Collection("Postgres")]
 public sealed class StartupTests : IDisposable
 {
-    readonly WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
-        .WithWebHostBuilder(b => b.UseEnvironment("Production"));
+    readonly WebApplicationFactory<Program> factory;
 
-    public void Dispose() => factory.Dispose();
+    readonly PostgresFixture postgres;
+    readonly string databaseName = PostgresFixture.NewDatabaseName();
+
+    public StartupTests(PostgresFixture postgres)
+    {
+        this.postgres = postgres;
+        var connectionString = postgres.ConnectionString(databaseName);
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b
+            .UseEnvironment("Production")
+            .UseSetting("ConnectionStrings:Default", connectionString));
+    }
 
     [Fact]
     public async Task App_starts_and_serves_the_home_page()
@@ -21,7 +42,7 @@ public sealed class StartupTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
-        Assert.Contains("<h1>NutriLog</h1>", html);
+        Assert.Matches("<h1[^>]*>NutriLog</h1>", html);
         Assert.Contains("_framework/blazor.web", html);
     }
 
@@ -31,34 +52,116 @@ public sealed class StartupTests : IDisposable
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync("/no-such-page", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("<h1>Not found</h1>", html);
     }
 
     [Fact]
-    public async Task Error_page_shows_the_request_id()
+    public void Logs_are_json_and_skip_ef_core_sql_commands()
+    {
+        var console = factory.Services.GetRequiredService<IOptionsMonitor<ConsoleLoggerOptions>>().CurrentValue;
+        var loggers = factory.Services.GetRequiredService<ILoggerFactory>();
+
+        Assert.Equal(ConsoleFormatterNames.Json, console.FormatterName);
+        Assert.False(loggers.CreateLogger("Microsoft.EntityFrameworkCore.Database.Command").IsEnabled(LogLevel.Information));
+        Assert.True(loggers.CreateLogger("Microsoft.EntityFrameworkCore.Migrations").IsEnabled(LogLevel.Information));
+    }
+
+    [Fact]
+    public async Task Pages_retry_database_outages_but_the_migration_does_not()
+    {
+        var pages = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        var migration = factory.Services.GetRequiredKeyedService<IDbContextFactory<AppDbContext>>(DatabaseMigrator.DbFactoryKey);
+
+        await using var pageDb = await pages.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        await using var migrationDb = await migration.CreateDbContextAsync(TestContext.Current.CancellationToken);
+        Assert.True(pageDb.Database.CreateExecutionStrategy().RetriesOnFailure);
+        Assert.False(migrationDb.Database.CreateExecutionStrategy().RetriesOnFailure);
+    }
+
+    [Theory]
+    [InlineData("/healthz/live")]
+    [InlineData("/healthz/ready")]
+    public async Task Health_checks_report_healthy(string path)
     {
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/Error", TestContext.Current.CancellationToken);
-        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("An error occurred while processing your request.", html);
-        Assert.Matches("<strong>Request ID:</strong> <code>[^<]+</code>", html);
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
-    public async Task Https_responses_carry_hsts_outside_development()
+    public async Task Without_the_database_only_readiness_fails()
     {
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            // UseHsts skips localhost.
-            BaseAddress = new Uri("https://nutrilog.example"),
-        });
+        using var client = factory.CreateClient();
+        await DropDatabaseAsync();
 
-        var response = await client.GetAsync("/", TestContext.Current.CancellationToken);
+        var live = await client.GetAsync("/healthz/live", TestContext.Current.CancellationToken);
+        var ready = await client.GetAsync("/healthz/ready", TestContext.Current.CancellationToken);
 
-        Assert.True(response.Headers.Contains("Strict-Transport-Security"));
+        Assert.Equal(HttpStatusCode.OK, live.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, ready.StatusCode);
+        Assert.Equal("Unhealthy", await ready.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
+
+    [Theory]
+    [InlineData("https", true)]
+    [InlineData(null, false)]
+    public async Task Hsts_is_sent_when_the_proxy_received_https(string? forwardedProto, bool expectHsts)
+    {
+        using var app = factory.WithWebHostBuilder(b => b.ConfigureServices(s =>
+            s.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(IPAddress.Parse("10.42.0.17")))));
+        using var client = app.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/healthz/live");
+        // UseHsts skips localhost.
+        request.Headers.Host = "nutrilog.example";
+        if (forwardedProto is not null)
+            request.Headers.Add("X-Forwarded-Proto", forwardedProto);
+
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(expectHsts, response.Headers.Contains("Strict-Transport-Security"));
+    }
+
+    // TestServer has no remote address; ForwardedHeaders only trusts loopback proxies unless told otherwise.
+    sealed class RemoteIpStartupFilter(IPAddress proxy) : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((context, nextMiddleware) =>
+            {
+                context.Connection.RemoteIpAddress = proxy;
+                return nextMiddleware(context);
+            });
+            next(app);
+        };
+    }
+
+    [Fact]
+    public void A_failed_start_is_logged_as_critical()
+    {
+        var logs = new FakeLogCollector();
+        using var broken = factory.WithWebHostBuilder(b => b
+            .UseSetting("ConnectionStrings:Default", postgres.ConnectionString(databaseName, password: "wrong-Password1"))
+            .ConfigureLogging(l => l.AddProvider(new FakeLoggerProvider(logs))));
+
+        Assert.ThrowsAny<Exception>(() => broken.CreateClient());
+
+        var failure = Assert.Single(logs.GetSnapshot(), r => r.Level == LogLevel.Critical);
+        Assert.Equal(3, failure.Id.Id);
+        Assert.Equal(PostgresErrorCodes.InvalidPassword, Assert.IsType<PostgresException>(failure.Exception).SqlState);
+    }
+
+    // The app can't start without its database (it migrates at startup), so the database goes away afterwards.
+    async Task DropDatabaseAsync()
+    {
+        NpgsqlConnection.ClearAllPools();
+        await postgres.ExecuteAsync($"DROP DATABASE {databaseName} WITH (FORCE)");
+    }
+
+    public void Dispose() => factory.Dispose();
 }

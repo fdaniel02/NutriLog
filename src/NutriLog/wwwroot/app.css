@@ -24,15 +24,16 @@ h1:focus {
         content: "An error has occurred."
     }
 
-.darker-border-checkbox.form-check-input {
-    border-color: #929292;
-}
-
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-    color: var(--bs-secondary-color);
-    text-align: end;
-}
-
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-    text-align: start;
-}
+/* ---- NutriLog theme, shared with RunStats ---- */
+:root { --bg:#0d1117; --card:#161b22; --line:#30363d; --text:#e6edf3; --muted:#8b949e; --accent:#2f81f7; --danger:#da3633; }
+* { box-sizing: border-box; }
+html, body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; font-size:16px; }
+.app-header { display:flex; flex-wrap:wrap; align-items:center; gap:8px 24px; padding:calc(12px + env(safe-area-inset-top)) 16px 12px; border-bottom:1px solid var(--line); background:var(--card); }
+.brand { color:var(--text); text-decoration:none; font-weight:700; font-size:1.2rem; }
+main.page { max-width:1200px; margin:0 auto; padding:24px 16px calc(24px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:16px; }
+h1 { font-size:1.6rem; margin:0; }
+.muted { color:var(--muted); }
+/* Flex and grid items are at least as wide as their content; a wide table must scroll, not widen the page. */
+main.page > * { min-width:0; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; min-width:0; }
+.visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }

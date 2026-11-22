@@ -10,7 +10,7 @@ Food tracker with macros, micros and targets that follow my runs.
 ```
 NutriLog.slnx
 src/NutriLog/                the app (Blazor Server)
-tests/NutriLog.Tests/        tests (xUnit v3)
+tests/NutriLog.Tests/        unit, component (bUnit) and PostgreSQL tests (xUnit v3)
 .github/workflows/ci.yml     build and test on every pull request and push to main; on main, publish the image
 .github/dependabot.yml       weekly update pull requests for NuGet packages, the .NET SDK and GitHub Actions
 ```
@@ -38,6 +38,61 @@ dotnet test --coverlet
 
 Tests run on Microsoft Testing Platform (set in `global.json`). `--coverlet` writes an OpenCover report
 to `TestResults/coverage.opencover.*.xml`; the settings are in `tests/NutriLog.Tests/testconfig.json`.
+
+Some tests run against a real PostgreSQL in a container (Testcontainers, image `postgres:18`), so Docker must be running.
+
+## Data
+
+PostgreSQL, through EF Core. The app applies its migrations at startup. After changing the model, add a migration;
+a test fails if the model has changes without one:
+
+```powershell
+dotnet ef migrations add <Name> --project src/NutriLog
+```
+
+- **Nutrients**: a fixed list (energy, macros, fatty acids, vitamins, minerals), each with its unit, seeded by the
+  migrations (`Data/Nutrients.cs`). The ids never change; adding a nutrient takes a migration.
+- **Foods**: name, source (`Nevo`, `Usda`, `Off`, `Own`) and the id there, barcode, and nutrient values per 100 g
+  (or 100 ml). A nutrient without a value has no row: missing, never 0.
+- **Portions** per food, e.g. "slice" = 35 g.
+- **Recipes**: foods with grams, and the number of servings it makes.
+- **Diary entries**: date, meal, and either a food in grams or portions, or a recipe in servings. Check constraints
+  keep these combinations valid. A food or recipe that's in a recipe or the diary can't be deleted, so past days keep
+  their numbers.
+
+## Configuration
+
+The app needs the connection string `ConnectionStrings:Default`. It is not stored in `appsettings.json`;
+the app refuses to start without it.
+
+Health checks: `/healthz/live` (the app runs) and `/healthz/ready` (the database answers too).
+
+### Logging
+
+Logs go to stdout as one JSON object per line, for a log collector (e.g. Grafana Alloy → Loki) to pick up.
+Locally (`Development`) they use the plain console format. Each log message has a fixed event id (see `src/NutriLog/Log.cs`).
+
+At startup the app applies database migrations. While PostgreSQL is unreachable it tries 15 times, 4 seconds apart,
+and logs each failed attempt as a warning. Errors that waiting won't fix (wrong password, missing database, no
+permission to connect) stop it at once. A startup failure is logged as `Critical` and the process exits with code 1.
+
+Traces and metrics go to an OpenTelemetry collector when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+### Local development
+
+Run PostgreSQL in Docker; the app creates the database and its tables on the first start:
+
+```powershell
+docker run -d --name nutrilog-db -p 5432:5432 -e POSTGRES_USER=nutrilog -e POSTGRES_PASSWORD=<password> postgres:18
+```
+
+The connection string lives in user-secrets (stored in `%APPDATA%\Microsoft\UserSecrets\`, outside the project):
+
+```powershell
+dotnet user-secrets set --project src/NutriLog "ConnectionStrings:Default" "Host=localhost;Database=nutrilog;Username=nutrilog;Password=<password>"
+```
+
+User-secrets are only loaded when `ASPNETCORE_ENVIRONMENT=Development` (the default in `launchSettings.json`).
 
 ## CI
 
