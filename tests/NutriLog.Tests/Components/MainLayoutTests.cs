@@ -1,12 +1,16 @@
 using Bunit;
 using NutriLog.Components.Layout;
+using NutriLog.Features.Sources;
 
 namespace NutriLog.Tests.Components;
 
 public class MainLayoutTests : BunitContext
 {
-    IRenderedComponent<MainLayout> Render() =>
-        Render<MainLayout>(p => p.Add(l => l.Body, b => b.AddMarkupContent(0, "<p id=\"body\">Page</p>")));
+    IRenderedComponent<MainLayout> Render()
+    {
+        ComponentFactories.AddStub<SourceFooter>("<footer class=\"source-footer\">Sources</footer>");
+        return Render<MainLayout>(p => p.Add(l => l.Body, b => b.AddMarkupContent(0, "<p id=\"body\">Page</p>")));
+    }
 
     [Fact]
     public void Shows_the_page_inside_main()
@@ -14,6 +18,12 @@ public class MainLayoutTests : BunitContext
         var layout = Render();
 
         Assert.Equal("Page", layout.Find("main > #body").TextContent);
+    }
+
+    [Fact]
+    public void The_source_reference_follows_the_page()
+    {
+        Assert.Equal("Sources", Render().Find("main + footer.source-footer").TextContent);
     }
 
     [Fact]

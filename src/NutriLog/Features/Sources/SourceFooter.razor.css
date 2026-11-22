@@ -1,0 +1,11 @@
+.source-footer {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px calc(24px + env(safe-area-inset-bottom));
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+    .source-footer p {
+        margin: 4px 0;
+    }

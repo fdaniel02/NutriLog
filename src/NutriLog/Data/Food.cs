@@ -4,6 +4,7 @@ public class Food
 {
     public int Id { get; init; }
     public required string Name { get; set; }
+    public string? NameNl { get; set; }
     public FoodSource Source { get; set; }
     // The food's id in its source (NEVO code, FoodData Central id, Open Food Facts barcode); none for own foods.
     public string? SourceId { get; set; }
@@ -18,10 +19,12 @@ public class Food
     public List<Portion> Portions { get; init; } = [];
 }
 
+// The two FoodData Central datasets are separate sources: each import replaces only its own foods.
 public enum FoodSource
 {
     Nevo,
-    Usda,
+    UsdaFoundation,
+    UsdaSrLegacy,
     Off,
     Own
 }
@@ -46,4 +49,6 @@ public class Portion
     public int FoodId { get; init; }
     public required string Name { get; set; }
     public double Grams { get; set; }
+    // Imported portions are replaced by the next import; the others were added by hand and stay.
+    public bool Imported { get; set; }
 }

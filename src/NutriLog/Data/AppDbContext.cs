@@ -7,6 +7,7 @@ namespace NutriLog.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
     public const int MaxNameLength = 200;
+    public const int MaxPortionNameLength = 100;
 
     public DbSet<Nutrient> Nutrients => Set<Nutrient>();
     public DbSet<Food> Foods => Set<Food>();
@@ -15,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Recipe> Recipes => Set<Recipe>();
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
     public DbSet<DiaryEntry> DiaryEntries => Set<DiaryEntry>();
+    public DbSet<DataImport> DataImports => Set<DataImport>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -31,7 +33,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Food>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(MaxNameLength);
-            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(10).IsUnicode(false);
+            e.Property(x => x.NameNl).HasMaxLength(MaxNameLength);
+            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20).IsUnicode(false);
             e.Property(x => x.SourceId).HasMaxLength(50).IsUnicode(false);
             e.Property(x => x.Barcode).HasMaxLength(20).IsUnicode(false);
             e.Property(x => x.Basis).HasConversion<string>().HasMaxLength(15).IsUnicode(false);
@@ -51,7 +54,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<Portion>(e =>
         {
-            e.Property(x => x.Name).HasMaxLength(100);
+            e.Property(x => x.Name).HasMaxLength(MaxPortionNameLength);
             // Lets a diary entry's portion refer to its food too, so it can't name another food's portion.
             e.HasAlternateKey(x => new { x.Id, x.FoodId });
             e.ToTable(t => t.HasCheckConstraint("CK_Portions_Grams", "\"Grams\" > 0"));
@@ -88,6 +91,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 t.HasCheckConstraint("CK_DiaryEntries_Servings", "(\"QuantityUnit\" = 'Servings') = (\"RecipeId\" IS NOT NULL)");
                 t.HasCheckConstraint("CK_DiaryEntries_Quantity", "\"Quantity\" > 0");
             });
+        });
+
+        modelBuilder.Entity<DataImport>(e =>
+        {
+            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20).IsUnicode(false);
+            e.Property(x => x.Version).HasMaxLength(50);
+            e.HasIndex(x => new { x.Source, x.ImportedUtc });
         });
 
         // Npgsql only writes timestamptz from DateTime values with Kind = Utc, and a value can carry the wrong Kind.
