@@ -134,10 +134,10 @@ public class RecipesTests(PostgresFixture postgres)
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        await s.Recipes.LogAsync(Today, new TimeOnly(8, 0), id, 1.5, Token);
+        await s.Recipes.LogAsync(Today, new TimeOnly(8, 0), id, RecipeAmount.InServings(1.5), Token);
 
         await s.Recipes.UpdateAsync(id, Porridge(s, oats: 200), Token);
-        var later = await s.Recipes.LogAsync(Today, new TimeOnly(15, 0), id, 1, Token);
+        var later = await s.Recipes.LogAsync(Today, new TimeOnly(15, 0), id, RecipeAmount.InServings(1), Token);
 
         var day = await s.Data.Diary.GetDayAsync(Today, Token);
         Assert.Equal(2, day.Entries.Count);
@@ -152,24 +152,92 @@ public class RecipesTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_recipe_logged_in_grams_keeps_its_serving_weight_when_the_recipe_changes()
+    {
+        var s = await SetUpAsync();
+        var id = await s.Recipes.CreateAsync(Porridge(s), Token);
+        // 500 g in 2 servings: 250 g a serving, 305 kcal.
+        var entryId = await s.Recipes.LogAsync(Today, DiaryData.Noon, id, RecipeAmount.InGrams(125), Token);
+
+        await s.Recipes.UpdateAsync(id, Porridge(s, servings: 1), Token);
+
+        var entry = await s.Recipes.GetEntryAsync(entryId, Token);
+        Assert.Equal((RecipeAmount.InGrams(125), 250.0), (entry!.Amount, entry.Snapshot.ServingGrams));
+        Assert.Equal(152.5, entry.Snapshot.Nutrients(entry.Amount)[Nutrients.Energy].Amount, 6);
+        var item = (await s.Data.Diary.GetDayAsync(Today, Token)).Entries.Single();
+        Assert.Equal(("125 g", 152.5), (item.Amount, item.Nutrients[Nutrients.Energy].Amount));
+        Assert.Equal(new LoggedAmount(null, id, 125, null, RecipeUnit.Grams), item.Logged);
+    }
+
+    [Fact]
+    public async Task A_recipe_entry_can_change_between_servings_and_grams()
+    {
+        var s = await SetUpAsync();
+        var id = await s.Recipes.CreateAsync(Porridge(s), Token);
+        var entryId = await s.Recipes.LogAsync(Today, DiaryData.Noon, id, RecipeAmount.InServings(1), Token);
+
+        Assert.True(await s.Recipes.UpdateEntryAsync(entryId, DiaryData.Noon, RecipeAmount.InGrams(500), Token));
+        var inGrams = (await s.Data.Diary.GetDayAsync(Today, Token)).Entries.Single();
+        Assert.True(await s.Recipes.UpdateEntryAsync(entryId, DiaryData.Noon, RecipeAmount.InServings(0.5), Token));
+        var inServings = (await s.Data.Diary.GetDayAsync(Today, Token)).Entries.Single();
+
+        Assert.Equal(("500 g", 610.0), (inGrams.Amount, inGrams.Nutrients[Nutrients.Energy].Amount));
+        Assert.Equal(("0.5 servings", 152.5), (inServings.Amount, inServings.Nutrients[Nutrients.Energy].Amount));
+    }
+
+    [Fact]
+    public async Task A_copied_recipe_in_grams_stays_in_grams_with_the_recipe_as_it_is_now()
+    {
+        var s = await SetUpAsync();
+        var id = await s.Recipes.CreateAsync(Porridge(s), Token);
+        await s.Recipes.LogAsync(Today.AddDays(-1), DiaryData.Noon, id, RecipeAmount.InGrams(250), Token);
+        await s.Recipes.UpdateAsync(id, Porridge(s, servings: 1), Token);
+
+        await s.Data.Diary.CopyAsync(Today.AddDays(-1), Today, Token);
+
+        var copied = (await s.Data.Diary.GetDayAsync(Today, Token)).Entries.Single();
+        // Now one 500 g serving of 610 kcal.
+        Assert.Equal(("250 g", 305.0), (copied.Amount, copied.Nutrients[Nutrients.Energy].Amount));
+    }
+
+    [Fact]
+    public async Task An_amount_in_an_unknown_unit_is_refused()
+    {
+        var s = await SetUpAsync();
+        var id = await s.Recipes.CreateAsync(Porridge(s), Token);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, DiaryData.Noon, id, new RecipeAmount(1, (RecipeUnit)7), Token));
+    }
+
+    [Fact]
+    public void An_amount_describes_itself_in_both_units()
+    {
+        var snapshot = new RecipeSnapshot(new Dictionary<string, (double, bool)>(), 250);
+
+        Assert.Equal(["1.5 servings · 375 g", "100 g · 0.4 servings"],
+            new[] { RecipeAmount.InServings(1.5), RecipeAmount.InGrams(100) }.Select(snapshot.Describe));
+        Assert.Equal(["1.5 servings", "100 g"], new[] { RecipeAmount.InServings(1.5), RecipeAmount.InGrams(100) }.Select(a => a.Logged));
+    }
+
+    [Fact]
     public async Task A_recipe_entry_can_be_read_changed_and_deleted()
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        var entryId = await s.Recipes.LogAsync(Today, DiaryData.Noon, id, 1, Token);
+        var entryId = await s.Recipes.LogAsync(Today, DiaryData.Noon, id, RecipeAmount.InServings(1), Token);
         await s.Recipes.UpdateAsync(id, Porridge(s, oats: 200), Token);
 
         var logged = await s.Recipes.GetEntryAsync(entryId, Token);
-        Assert.True(await s.Recipes.UpdateEntryAsync(entryId, new TimeOnly(13, 15), 2, Token));
+        Assert.True(await s.Recipes.UpdateEntryAsync(entryId, new TimeOnly(13, 15), RecipeAmount.InServings(2), Token));
 
         var entry = await s.Recipes.GetEntryAsync(entryId, Token);
         Assert.Equal(DiaryData.Noon, logged!.Time);
         Assert.Equal((Today, new TimeOnly(13, 15), id, "Porridge", 2.0),
-            (entry!.Date, entry.Time, entry.RecipeId, entry.RecipeName, entry.Servings));
+            (entry!.Date, entry.Time, entry.RecipeId, entry.RecipeName, entry.Amount.Quantity));
         // Still the recipe as it was logged.
-        Assert.Equal(610, entry.Nutrients(entry.Servings)[Nutrients.Energy].Amount, 6);
+        Assert.Equal(610, entry.Snapshot.Nutrients(entry.Amount)[Nutrients.Energy].Amount, 6);
         Assert.Null(await s.Data.Diary.GetEntryAsync(entryId, Token));
-        Assert.False(await s.Recipes.UpdateEntryAsync(-1, DiaryData.Noon, 2, Token));
+        Assert.False(await s.Recipes.UpdateEntryAsync(-1, DiaryData.Noon, RecipeAmount.InServings(2), Token));
 
         Assert.True(await s.Data.Diary.DeleteEntryAsync(entryId, Token));
         Assert.Null(await s.Recipes.GetEntryAsync(entryId, Token));
@@ -184,7 +252,7 @@ public class RecipesTests(PostgresFixture postgres)
         var entryId = await s.Data.Diary.AddEntryAsync(Today, DiaryData.Noon, s.Oats.Id, new EntryAmount(50, null), Token);
 
         Assert.Null(await s.Recipes.GetEntryAsync(entryId, Token));
-        Assert.False(await s.Recipes.UpdateEntryAsync(entryId, DiaryData.Noon, 2, Token));
+        Assert.False(await s.Recipes.UpdateEntryAsync(entryId, DiaryData.Noon, RecipeAmount.InServings(2), Token));
     }
 
     [Fact]
@@ -193,9 +261,9 @@ public class RecipesTests(PostgresFixture postgres)
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, DiaryData.Noon, id, 0, Token));
-        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, DiaryData.Noon, -1, 1, Token));
-        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.UpdateEntryAsync(1, DiaryData.Noon, double.PositiveInfinity, Token));
+        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, DiaryData.Noon, id, RecipeAmount.InServings(0), Token));
+        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, DiaryData.Noon, -1, RecipeAmount.InServings(1), Token));
+        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.UpdateEntryAsync(1, DiaryData.Noon, RecipeAmount.InServings(double.PositiveInfinity), Token));
     }
 
     [Fact]
@@ -203,7 +271,7 @@ public class RecipesTests(PostgresFixture postgres)
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        await s.Recipes.LogAsync(Today.AddDays(-1), new TimeOnly(8, 15), id, 1, Token);
+        await s.Recipes.LogAsync(Today.AddDays(-1), new TimeOnly(8, 15), id, RecipeAmount.InServings(1), Token);
         await s.Data.Diary.AddEntryAsync(Today.AddDays(-1), DiaryData.Noon, s.Milk.Id, new EntryAmount(100, null), Token);
         await s.Recipes.UpdateAsync(id, Porridge(s, oats: 200), Token);
 
@@ -222,7 +290,7 @@ public class RecipesTests(PostgresFixture postgres)
         var s = await SetUpAsync();
         var logged = await s.Recipes.CreateAsync(Porridge(s), Token);
         var unused = await s.Recipes.CreateAsync(Porridge(s) with { Name = "Unused" }, Token);
-        await s.Recipes.LogAsync(Today, DiaryData.Noon, logged, 1, Token);
+        await s.Recipes.LogAsync(Today, DiaryData.Noon, logged, RecipeAmount.InServings(1), Token);
 
         Assert.Equal(RecipeDeleteResult.InDiary, await s.Recipes.DeleteAsync(logged, Token));
         Assert.Equal(RecipeDeleteResult.Deleted, await s.Recipes.DeleteAsync(unused, Token));

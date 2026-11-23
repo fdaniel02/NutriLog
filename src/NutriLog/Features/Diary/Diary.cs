@@ -36,8 +36,11 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         var items = entries.Select(e =>
         {
             if (e.RecipeId is { } recipeId)
-                return new DiaryItem(e.Id, e.TimeEaten, recipeNames[recipeId], NutrientFormat.Servings(e.Quantity),
-                    NutrientTotals.ForServings(Recipes.Recipes.PerServing(e), e.Quantity), new LoggedAmount(null, recipeId, e.Quantity, null));
+            {
+                var recipeAmount = Recipes.Recipes.AmountOf(e);
+                return new DiaryItem(e.Id, e.TimeEaten, recipeNames[recipeId], recipeAmount.Logged,
+                    Recipes.Recipes.SnapshotOf(e).Nutrients(recipeAmount), new LoggedAmount(null, recipeId, e.Quantity, null, recipeAmount.Unit));
+            }
             var food = foods[e.FoodId!.Value];
             var amount = AmountOf(e);
             return new DiaryItem(e.Id, e.TimeEaten, food.Name, food.Describe(amount), food.Nutrients(amount),
@@ -163,7 +166,7 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         var snapshots = await Recipes.Recipes.SnapshotsAsync(db,
             source.Where(e => e.RecipeId != null).Select(e => e.RecipeId!.Value).Distinct().ToList(), cancellationToken);
         db.DiaryEntries.AddRange(source.Select(e => e.RecipeId is { } recipeId
-            ? Recipes.Recipes.NewEntry(to, e.TimeEaten, recipeId, e.Quantity, snapshots[recipeId], now)
+            ? Recipes.Recipes.NewEntry(to, e.TimeEaten, recipeId, Recipes.Recipes.AmountOf(e), snapshots[recipeId], now)
             : new DiaryEntry
             {
                 Date = to,

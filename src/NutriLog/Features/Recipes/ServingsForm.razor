@@ -2,19 +2,26 @@
     <h2>@Name</h2>
     <div class="form-row">
         <label>
-            Servings
-            <input type="number" inputmode="decimal" step="any" min="0" required @bind="servings" />
+            Amount
+            <input type="number" inputmode="decimal" step="any" min="0" required @bind="quantity" />
+        </label>
+        <label>
+            Unit
+            <select @bind="unit" @bind:after="ConvertQuantity">
+                <option value="@RecipeUnit.Servings">servings (@NutrientFormat.Amount(Snapshot.ServingGrams) g each)</option>
+                <option value="@RecipeUnit.Grams">g</option>
+            </select>
         </label>
         <label>
             Time
             <input type="time" required @bind="time" />
         </label>
     </div>
-    @if (Servings is { } s)
+    @if (Amount is { } amount)
     {
-        var totals = NutrientTotals.ForServings(PerServing, s);
+        var totals = Snapshot.Nutrients(amount);
         <p class="amount-preview">
-            @NutrientFormat.Servings(s):
+            @Snapshot.Describe(amount):
             @NutrientFormat.WithUnit(totals[Nutrients.Energy], "kcal") ·
             P @NutrientFormat.WithUnit(totals[Nutrients.Protein], "g") ·
             C @NutrientFormat.WithUnit(totals[Nutrients.Carbohydrate], "g") ·
@@ -23,16 +30,16 @@
     }
     else
     {
-        <p class="amount-preview muted">Enter a number of servings above 0.</p>
+        <p class="amount-preview muted">Enter an amount above 0.</p>
     }
     <div class="form-actions">
-        <button type="submit" class="button primary" disabled="@(Servings is null || time is null || busy)">@SubmitLabel</button>
+        <button type="submit" class="button primary" disabled="@(Amount is null || time is null || busy)">@SubmitLabel</button>
         @ChildContent
     </div>
 </form>
-@if (Servings is { } shown)
+@if (Amount is { } shown)
 {
-    <NutritionCard Totals="NutrientTotals.ForServings(PerServing, shown)" Caption="@NutrientFormat.Servings(shown)" />
+    <NutritionCard Totals="Snapshot.Nutrients(shown)" Caption="@Snapshot.Describe(shown)" />
 }
 
 @code {
@@ -40,10 +47,10 @@
     public string Name { get; set; } = "";
 
     [Parameter, EditorRequired]
-    public IReadOnlyDictionary<string, (double PerServing, bool Complete)> PerServing { get; set; } = null!;
+    public RecipeSnapshot Snapshot { get; set; } = null!;
 
     [Parameter]
-    public double InitialServings { get; set; } = 1;
+    public RecipeAmount InitialAmount { get; set; } = RecipeAmount.InServings(1);
 
     [Parameter, EditorRequired]
     public TimeOnly InitialTime { get; set; }
@@ -52,12 +59,13 @@
     public string SubmitLabel { get; set; } = "Add";
 
     [Parameter]
-    public EventCallback<(TimeOnly Time, double Servings)> OnSubmit { get; set; }
+    public EventCallback<(TimeOnly Time, RecipeAmount Amount)> OnSubmit { get; set; }
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
-    double? servings;
+    double? quantity;
+    RecipeUnit unit;
     TimeOnly? time;
     bool busy;
     bool initialised;
@@ -67,20 +75,31 @@
         if (initialised)
             return;
         initialised = true;
-        servings = InitialServings;
+        quantity = InitialAmount.Quantity;
+        unit = InitialAmount.Unit;
         time = InitialTime;
     }
 
-    double? Servings => servings is { } s && s > 0 && double.IsFinite(s) ? s : null;
+    RecipeAmount? Amount => quantity is { } q && q > 0 && double.IsFinite(q) ? new RecipeAmount(q, unit) : null;
+
+    // Keeps the amount the same when only its unit changes.
+    void ConvertQuantity()
+    {
+        if (quantity is not { } q || q <= 0 || !double.IsFinite(q))
+            return;
+        quantity = unit == RecipeUnit.Grams
+            ? Math.Round(q * Snapshot.ServingGrams)
+            : Math.Round(q / Snapshot.ServingGrams, 2);
+    }
 
     async Task SubmitAsync()
     {
-        if (Servings is not { } s || time is not { } eaten || busy)
+        if (Amount is not { } amount || time is not { } eaten || busy)
             return;
         busy = true;
         try
         {
-            await OnSubmit.InvokeAsync((eaten, s));
+            await OnSubmit.InvokeAsync((eaten, amount));
         }
         finally
         {

@@ -178,10 +178,11 @@ public sealed class DataModelTests(PostgresFixture postgres) : IAsyncLifetime
         db.DiaryEntries.AddRange(
             Entry(e => (e.FoodId, e.Quantity, e.QuantityUnit) = (bread.Id, 70, QuantityUnit.Grams)),
             Entry(e => (e.FoodId, e.Quantity, e.QuantityUnit, e.PortionId) = (bread.Id, 2, QuantityUnit.Portion, slice.Id)),
-            Entry(e => (e.RecipeId, e.Quantity, e.QuantityUnit) = (recipe.Id, 0.5, QuantityUnit.Servings)));
+            Entry(e => (e.RecipeId, e.Quantity, e.QuantityUnit, e.ServingGrams) = (recipe.Id, 0.5, QuantityUnit.Servings, 70)),
+            Entry(e => (e.RecipeId, e.Quantity, e.QuantityUnit, e.ServingGrams) = (recipe.Id, 90, QuantityUnit.Grams, 70)));
         await db.SaveChangesAsync(Ct);
 
-        Assert.Equal(3, await db.DiaryEntries.CountAsync(Ct));
+        Assert.Equal(4, await db.DiaryEntries.CountAsync(Ct));
     }
 
     public static TheoryData<string, string> InvalidEntries => new()
@@ -191,7 +192,10 @@ public sealed class DataModelTests(PostgresFixture postgres) : IAsyncLifetime
         { "portion without id", "CK_DiaryEntries_Portion" },
         { "grams with portion id", "CK_DiaryEntries_Portion" },
         { "food in servings", "CK_DiaryEntries_Servings" },
-        { "recipe in grams", "CK_DiaryEntries_Servings" },
+        { "recipe in portions", "CK_DiaryEntries_RecipeUnit" },
+        { "recipe without serving weight", "CK_DiaryEntries_ServingGrams" },
+        { "recipe with zero serving weight", "CK_DiaryEntries_ServingGrams" },
+        { "food with serving weight", "CK_DiaryEntries_ServingGrams" },
         { "zero", "CK_DiaryEntries_Quantity" },
     };
 
@@ -209,7 +213,10 @@ public sealed class DataModelTests(PostgresFixture postgres) : IAsyncLifetime
             "portion without id" => Entry(e => (e.FoodId, e.QuantityUnit) = (bread.Id, QuantityUnit.Portion)),
             "grams with portion id" => Entry(e => (e.FoodId, e.QuantityUnit, e.PortionId) = (bread.Id, QuantityUnit.Grams, slice)),
             "food in servings" => Entry(e => (e.FoodId, e.QuantityUnit) = (bread.Id, QuantityUnit.Servings)),
-            "recipe in grams" => Entry(e => (e.RecipeId, e.QuantityUnit) = (recipe.Id, QuantityUnit.Grams)),
+            "recipe in portions" => Entry(e => (e.RecipeId, e.QuantityUnit, e.PortionId, e.ServingGrams) = (recipe.Id, QuantityUnit.Portion, slice, 70)),
+            "recipe without serving weight" => Entry(e => (e.RecipeId, e.QuantityUnit) = (recipe.Id, QuantityUnit.Grams)),
+            "recipe with zero serving weight" => Entry(e => (e.RecipeId, e.QuantityUnit, e.ServingGrams) = (recipe.Id, QuantityUnit.Grams, 0)),
+            "food with serving weight" => Entry(e => (e.FoodId, e.QuantityUnit, e.ServingGrams) = (bread.Id, QuantityUnit.Grams, 70)),
             "zero" => Entry(e => (e.FoodId, e.QuantityUnit, e.Quantity) = (bread.Id, QuantityUnit.Grams, 0)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };

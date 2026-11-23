@@ -15,7 +15,7 @@
 
 @if (recipe is not null)
 {
-    <ServingsForm Name="@recipe.Name" PerServing="recipe.Snapshot" InitialServings="InitialServings" InitialTime="now" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
+    <ServingsForm Name="@recipe.Name" Snapshot="recipe.Snapshot" InitialAmount="InitialRecipeAmount" InitialTime="now" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
         <a class="button" href="@DiaryUrls.Add(date)">Other food</a>
     </ServingsForm>
 }
@@ -95,6 +95,9 @@ else
     [SupplyParameterFromQuery(Name = "servings")]
     public double? Servings { get; set; }
 
+    [SupplyParameterFromQuery(Name = "grams")]
+    public double? Grams { get; set; }
+
     DateOnly date;
     TimeOnly now;
     FoodChoice? food;
@@ -131,9 +134,9 @@ else
         Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 
-    async Task AddRecipeAsync((TimeOnly Time, double Servings) input)
+    async Task AddRecipeAsync((TimeOnly Time, RecipeAmount Amount) input)
     {
-        await Recipes.LogAsync(date, input.Time, recipe!.Id, input.Servings);
+        await Recipes.LogAsync(date, input.Time, recipe!.Id, input.Amount);
         Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 
@@ -143,7 +146,15 @@ else
             ? new EntryAmount(q, PortionId)
             : null;
 
-    double InitialServings => Servings is { } s && double.IsFinite(s) && s > 0 ? s : 1;
+    RecipeAmount InitialRecipeAmount
+    {
+        get
+        {
+            if (Grams is { } g && double.IsFinite(g) && g > 0)
+                return RecipeAmount.InGrams(g);
+            return RecipeAmount.InServings(Servings is { } s && double.IsFinite(s) && s > 0 ? s : 1);
+        }
+    }
 
     public static string Details(FoodMatch match)
     {
