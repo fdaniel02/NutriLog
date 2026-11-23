@@ -10,6 +10,6 @@ public static class RecipeUrls
 
     public static string Edit(int recipeId) => $"recipes/{recipeId}";
 
-    public static string AddToDay(DateOnly date, Meal meal, int recipeId) =>
-        $"add?date={DiaryUrls.Format(date)}&meal={meal}&recipe={recipeId}";
+    public static string AddToDay(DateOnly date, int recipeId) =>
+        $"add?date={DiaryUrls.Format(date)}&recipe={recipeId}";
 }

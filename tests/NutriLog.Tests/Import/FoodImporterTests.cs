@@ -133,7 +133,7 @@ public sealed class FoodImporterTests(PostgresFixture postgres) : IAsyncLifetime
         var food = (await FoodsAsync()).Single();
         await AddAsync(new DiaryEntry
         {
-            Date = new DateOnly(2026, 11, 22), Meal = Meal.Snack, FoodId = food.Id, Quantity = 1,
+            Date = new DateOnly(2026, 11, 22), FoodId = food.Id, Quantity = 1,
             QuantityUnit = QuantityUnit.Portion, PortionId = food.Portions[0].Id,
         });
 
@@ -148,7 +148,7 @@ public sealed class FoodImporterTests(PostgresFixture postgres) : IAsyncLifetime
         await importer.ImportAsync(Nevo(Food("1"), Food("2", "Pear"), Food("3", "Plum"), Food("4", "Kiwi")), Ct);
         await AddAsync(new DiaryEntry
         {
-            Date = new DateOnly(2026, 11, 22), Meal = Meal.Snack, FoodId = await FoodIdAsync("2"), Quantity = 100, QuantityUnit = QuantityUnit.Grams,
+            Date = new DateOnly(2026, 11, 22), FoodId = await FoodIdAsync("2"), Quantity = 100, QuantityUnit = QuantityUnit.Grams,
         });
         await AddAsync(new Recipe { Name = "Jam", Servings = 10, Ingredients = [new RecipeIngredient { FoodId = await FoodIdAsync("3"), Grams = 500 }] });
 

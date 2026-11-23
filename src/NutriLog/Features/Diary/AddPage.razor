@@ -11,21 +11,21 @@
 <nav class="back-nav">
     <a href="@DiaryUrls.Day(date)">‹ @DiaryUrls.DayTitle(date, Clock.Today)</a>
 </nav>
-<h1>Add to @meal</h1>
+<h1>Add to @DiaryUrls.DayTitle(date, Clock.Today).ToLowerInvariant()</h1>
 
 @if (recipe is not null)
 {
-    <ServingsForm Name="@recipe.Name" PerServing="recipe.Snapshot" InitialMeal="meal" InitialTime="now" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
-        <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
+    <ServingsForm Name="@recipe.Name" PerServing="recipe.Snapshot" InitialTime="now" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
+        <a class="button" href="@DiaryUrls.Add(date)">Other food</a>
     </ServingsForm>
 }
 else if (food is not null)
 {
-    <AmountForm Food="food" InitialMeal="meal" InitialTime="now" SubmitLabel="Add" OnSubmit="AddAsync">
-        <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
+    <AmountForm Food="food" InitialTime="now" SubmitLabel="Add" OnSubmit="AddAsync">
+        <a class="button" href="@DiaryUrls.Add(date)">Other food</a>
         @if (NutriLog.Features.Foods.Foods.IsEditable(food.Source))
         {
-            <a class="button" href="@FoodUrls.Edit(food.Id, date, meal)">Edit food</a>
+            <a class="button" href="@FoodUrls.Edit(food.Id, date)">Edit food</a>
         }
     </AmountForm>
 }
@@ -41,7 +41,7 @@ else
                 @foreach (var match in recipeMatches)
                 {
                     <li>
-                        <a href="@RecipeUrls.AddToDay(date, meal, match.Id)">
+                        <a href="@RecipeUrls.AddToDay(date, match.Id)">
                             <span class="match-name">@match.Name</span>
                             <span class="match-details muted">Recipe · @NutrientFormat.WithUnit(match.EnergyPerServing, "kcal")/serving</span>
                         </a>
@@ -59,7 +59,7 @@ else
                 @foreach (var match in matches)
                 {
                     <li>
-                        <a href="@DiaryUrls.Add(date, meal, match.Id)">
+                        <a href="@DiaryUrls.Add(date, match.Id)">
                             <span class="match-name">@match.Name</span>
                             <span class="match-details muted">@Details(match)</span>
                         </a>
@@ -71,17 +71,14 @@ else
         {
             <p class="muted search-hint">@(string.IsNullOrWhiteSpace(query) ? "Search for a food to add." : "No food found.")</p>
         }
-        <a class="add-link" href="@BarcodeUrls.Scan(date, meal)">+ Scan a barcode</a>
-        <a class="add-link" href="@DiaryUrls.NewFood(date, meal)">+ New food from a label</a>
+        <a class="add-link" href="@BarcodeUrls.Scan(date)">+ Scan a barcode</a>
+        <a class="add-link" href="@DiaryUrls.NewFood(date)">+ New food from a label</a>
     </section>
 }
 
 @code {
     [SupplyParameterFromQuery(Name = "date")]
     public string? DateText { get; set; }
-
-    [SupplyParameterFromQuery(Name = "meal")]
-    public string? MealText { get; set; }
 
     [SupplyParameterFromQuery(Name = "food")]
     public int? FoodId { get; set; }
@@ -90,7 +87,6 @@ else
     public int? RecipeId { get; set; }
 
     DateOnly date;
-    Meal meal;
     TimeOnly now;
     FoodChoice? food;
     RecipeDetails? recipe;
@@ -102,7 +98,6 @@ else
     protected override async Task OnParametersSetAsync()
     {
         date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
-        meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
         now = Clock.Now;
         food = FoodId is { } id ? await Diary.GetFoodAsync(id) : null;
         recipe = RecipeId is { } recipeId ? await Recipes.GetAsync(recipeId) : null;
@@ -121,15 +116,15 @@ else
             (matches, recipeMatches) = (found, foundRecipes);
     }
 
-    async Task AddAsync((Meal Meal, TimeOnly Time, EntryAmount Amount) input)
+    async Task AddAsync((TimeOnly Time, EntryAmount Amount) input)
     {
-        await Diary.AddEntryAsync(date, input.Meal, input.Time, food!.Id, input.Amount);
+        await Diary.AddEntryAsync(date, input.Time, food!.Id, input.Amount);
         Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 
-    async Task AddRecipeAsync((Meal Meal, TimeOnly Time, double Servings) input)
+    async Task AddRecipeAsync((TimeOnly Time, double Servings) input)
     {
-        await Recipes.LogAsync(date, input.Meal, input.Time, recipe!.Id, input.Servings);
+        await Recipes.LogAsync(date, input.Time, recipe!.Id, input.Servings);
         Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 

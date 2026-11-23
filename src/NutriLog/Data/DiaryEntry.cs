@@ -5,7 +5,6 @@ public class DiaryEntry
 {
     public int Id { get; init; }
     public DateOnly Date { get; set; }
-    public Meal Meal { get; set; }
     // Local time of day, so it doesn't shift with time zones or DST; CreatedUtc stays the moment it was logged.
     public TimeOnly TimeEaten { get; set; }
     public int? FoodId { get; set; }
@@ -16,14 +15,6 @@ public class DiaryEntry
     public DateTime CreatedUtc { get; set; }
 
     public List<DiaryEntryNutrient> Nutrients { get; init; } = [];
-}
-
-public enum Meal
-{
-    Breakfast,
-    Lunch,
-    Dinner,
-    Snack
 }
 
 public enum QuantityUnit

@@ -14,7 +14,7 @@
     </nav>
     <h1>Edit entry</h1>
     <ServingsForm Name="@recipeEntry.RecipeName" PerServing="recipeEntry.PerServing" InitialServings="recipeEntry.Servings"
-                  InitialMeal="recipeEntry.Meal" InitialTime="recipeEntry.Time" SubmitLabel="Save" OnSubmit="SaveRecipeAsync">
+                  InitialTime="recipeEntry.Time" SubmitLabel="Save" OnSubmit="SaveRecipeAsync">
         <button type="button" class="button danger" @onclick="DeleteAsync">Delete</button>
     </ServingsForm>
     <p class="muted note">The nutrients are the recipe's when it was logged; a later change to the recipe doesn't change them.</p>
@@ -33,7 +33,7 @@ else
         <a href="@DiaryUrls.Day(entry.Date)">‹ @DiaryUrls.DayTitle(entry.Date, Clock.Today)</a>
     </nav>
     <h1>Edit entry</h1>
-    <AmountForm Food="entry.Food" Initial="entry.Amount" InitialMeal="entry.Meal" InitialTime="entry.Time" SubmitLabel="Save" OnSubmit="SaveAsync">
+    <AmountForm Food="entry.Food" Initial="entry.Amount" InitialTime="entry.Time" SubmitLabel="Save" OnSubmit="SaveAsync">
         <button type="button" class="button danger" @onclick="DeleteAsync">Delete</button>
     </AmountForm>
 }
@@ -53,15 +53,15 @@ else
         loaded = true;
     }
 
-    async Task SaveAsync((Meal Meal, TimeOnly Time, EntryAmount Amount) input)
+    async Task SaveAsync((TimeOnly Time, EntryAmount Amount) input)
     {
-        await Diary.UpdateEntryAsync(EntryId, input.Meal, input.Time, input.Amount);
+        await Diary.UpdateEntryAsync(EntryId, input.Time, input.Amount);
         Navigation.NavigateTo(DiaryUrls.Day(entry!.Date));
     }
 
-    async Task SaveRecipeAsync((Meal Meal, TimeOnly Time, double Servings) input)
+    async Task SaveRecipeAsync((TimeOnly Time, double Servings) input)
     {
-        await Recipes.UpdateEntryAsync(EntryId, input.Meal, input.Time, input.Servings);
+        await Recipes.UpdateEntryAsync(EntryId, input.Time, input.Servings);
         Navigation.NavigateTo(DiaryUrls.Day(recipeEntry!.Date));
     }
 

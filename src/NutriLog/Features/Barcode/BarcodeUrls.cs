@@ -5,5 +5,5 @@ namespace NutriLog.Features.Barcode;
 
 public static class BarcodeUrls
 {
-    public static string Scan(DateOnly date, Meal meal) => $"scan?date={DiaryUrls.Format(date)}&meal={meal}";
+    public static string Scan(DateOnly date) => $"scan?date={DiaryUrls.Format(date)}";
 }

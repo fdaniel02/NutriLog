@@ -14,7 +14,7 @@ public readonly record struct NutrientTotal(double Amount, int Known, int Missin
         new(a.Amount + b.Amount, a.Known + b.Known, a.Missing + b.Missing);
 }
 
-// One total per nutrient in Nutrients.All, for an entry, a meal or a day.
+// One total per nutrient in Nutrients.All, for an entry or a day.
 public sealed class NutrientTotals
 {
     public static readonly NutrientTotals Empty = new(new Dictionary<string, NutrientTotal>());

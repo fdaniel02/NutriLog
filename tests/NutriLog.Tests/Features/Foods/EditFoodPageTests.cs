@@ -47,7 +47,7 @@ public class EditFoodPageTests(PostgresFixture postgres) : BunitContext
     {
         var data = await SetUpAsync();
         var id = await AddScannedFoodAsync(data);
-        Navigation.NavigateTo(FoodUrls.Edit(id, Today, Meal.Lunch));
+        Navigation.NavigateTo(FoodUrls.Edit(id, Today));
         var page = Render<NewFoodPage>(p => p.Add(x => x.FoodId, id));
         page.WaitForElement("form.food-form");
 
@@ -59,7 +59,7 @@ public class EditFoodPageTests(PostgresFixture postgres) : BunitContext
         page.FindAll("input[type=number]")[0].Change("400");
         page.Find("form").Submit();
 
-        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Add(Today, Meal.Lunch, id), Navigation.Uri));
+        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Add(Today, id), Navigation.Uri));
         await using var db = await data.Factory.CreateDbContextAsync(Token);
         var food = await db.Foods.Include(f => f.Nutrients).SingleAsync(f => f.Id == id, Token);
         Assert.Equal([(Nutrients.Energy, 400.0), ("sodium", 480.0)],
@@ -81,10 +81,11 @@ public class EditFoodPageTests(PostgresFixture postgres) : BunitContext
     [Fact]
     public async Task A_new_food_from_an_unknown_barcode_keeps_the_barcode()
     {
-        var data = await SetUpAsync(FoodUrls.NewWithBarcode(Today, Meal.Snack, "87123456"));
+        var data = await SetUpAsync(FoodUrls.NewWithBarcode(Today, "87123456"));
         var page = Render<NewFoodPage>();
         page.WaitForElement("form.food-form");
         Assert.Equal("Barcode 87123456", page.Find(".food-barcode").TextContent);
+        Assert.Equal(("‹ Add food", DiaryUrls.Add(Today)), (page.Find(".back-nav a").TextContent, page.Find(".back-nav a").GetAttribute("href")));
 
         page.Find("input[type=text]").Change("Crackers");
         page.Find("form").Submit();
@@ -97,18 +98,18 @@ public class EditFoodPageTests(PostgresFixture postgres) : BunitContext
     [Fact]
     public async Task The_add_page_links_to_scanning_and_to_editing_an_own_or_scanned_food()
     {
-        var data = await SetUpAsync(DiaryUrls.Add(Today, Meal.Lunch));
+        var data = await SetUpAsync(DiaryUrls.Add(Today));
         var id = await AddScannedFoodAsync(data);
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
         var page = Render<AddPage>();
         page.WaitForElement(".search");
-        Assert.Contains(BarcodeUrls.Scan(Today, Meal.Lunch), page.FindAll(".add-link").Select(a => a.GetAttribute("href")));
+        Assert.Contains(BarcodeUrls.Scan(Today), page.FindAll(".add-link").Select(a => a.GetAttribute("href")));
 
-        Navigation.NavigateTo(DiaryUrls.Add(Today, Meal.Lunch, id));
+        Navigation.NavigateTo(DiaryUrls.Add(Today, id));
         page.WaitForAssertion(() =>
-            Assert.Contains(FoodUrls.Edit(id, Today, Meal.Lunch), page.FindAll("a.button").Select(a => a.GetAttribute("href"))));
+            Assert.Contains(FoodUrls.Edit(id, Today), page.FindAll("a.button").Select(a => a.GetAttribute("href"))));
 
-        Navigation.NavigateTo(DiaryUrls.Add(Today, Meal.Lunch, bread.Id));
+        Navigation.NavigateTo(DiaryUrls.Add(Today, bread.Id));
         page.WaitForAssertion(() => Assert.Equal("Bread", page.Find("form.amount-form h2").TextContent));
         Assert.DoesNotContain(page.FindAll("a.button"), a => a.TextContent == "Edit food");
     }

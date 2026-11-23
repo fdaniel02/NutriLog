@@ -102,12 +102,6 @@ namespace NutriLog.Migrations
                     b.Property<int?>("FoodId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Meal")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .IsUnicode(false)
-                        .HasColumnType("character varying(10)");
-
                     b.Property<int?>("PortionId")
                         .HasColumnType("integer");
 

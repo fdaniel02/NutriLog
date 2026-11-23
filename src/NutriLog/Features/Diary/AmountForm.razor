@@ -16,15 +16,6 @@
             </select>
         </label>
         <label>
-            Meal
-            <select @bind="meal">
-                @foreach (var m in Enum.GetValues<Meal>())
-                {
-                    <option value="@m">@m</option>
-                }
-            </select>
-        </label>
-        <label>
             Time
             <input type="time" required @bind="time" @bind:format="HH:mm" />
         </label>
@@ -57,9 +48,6 @@
     [Parameter]
     public EntryAmount? Initial { get; set; }
 
-    [Parameter]
-    public Meal InitialMeal { get; set; }
-
     [Parameter, EditorRequired]
     public TimeOnly InitialTime { get; set; }
 
@@ -67,7 +55,7 @@
     public string SubmitLabel { get; set; } = "Add";
 
     [Parameter]
-    public EventCallback<(Meal Meal, TimeOnly Time, EntryAmount Amount)> OnSubmit { get; set; }
+    public EventCallback<(TimeOnly Time, EntryAmount Amount)> OnSubmit { get; set; }
 
     // Further buttons next to the submit button.
     [Parameter]
@@ -77,7 +65,6 @@
 
     double? quantity;
     string unit = "";
-    Meal meal;
     TimeOnly? time;
     bool busy;
     int? foodId;
@@ -92,7 +79,6 @@
             start = new EntryAmount(DefaultGrams, null);
         quantity = start.Quantity;
         unit = start.PortionId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
-        meal = InitialMeal;
         time = InitialTime;
     }
 
@@ -114,7 +100,7 @@
         busy = true;
         try
         {
-            await OnSubmit.InvokeAsync((meal, eaten, amount));
+            await OnSubmit.InvokeAsync((eaten, amount));
         }
         finally
         {

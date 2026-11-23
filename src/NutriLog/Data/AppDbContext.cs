@@ -78,7 +78,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<DiaryEntry>(e =>
         {
-            e.Property(x => x.Meal).HasConversion<string>().HasMaxLength(10).IsUnicode(false);
             e.Property(x => x.QuantityUnit).HasConversion<string>().HasMaxLength(10).IsUnicode(false);
             e.HasIndex(x => x.Date);
             // Restrict: a food or recipe that's in the diary stays, so past days keep their numbers.

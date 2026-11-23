@@ -11,10 +11,10 @@ public interface IRecipes
     Task<int> CreateAsync(RecipeInput recipe, CancellationToken cancellationToken = default);
     Task<bool> UpdateAsync(int recipeId, RecipeInput recipe, CancellationToken cancellationToken = default);
     Task<RecipeDeleteResult> DeleteAsync(int recipeId, CancellationToken cancellationToken = default);
-    Task<int> LogAsync(DateOnly date, Meal meal, TimeOnly timeEaten, int recipeId, double servings, CancellationToken cancellationToken = default);
+    Task<int> LogAsync(DateOnly date, TimeOnly timeEaten, int recipeId, double servings, CancellationToken cancellationToken = default);
     Task<RecipeEntryDetails?> GetEntryAsync(int entryId, CancellationToken cancellationToken = default);
     // Keeps the nutrients the entry was logged with.
-    Task<bool> UpdateEntryAsync(int entryId, Meal meal, TimeOnly timeEaten, double servings, CancellationToken cancellationToken = default);
+    Task<bool> UpdateEntryAsync(int entryId, TimeOnly timeEaten, double servings, CancellationToken cancellationToken = default);
 }
 
 public sealed class Recipes(IDbContextFactory<AppDbContext> dbFactory, TimeProvider time) : IRecipes
@@ -88,14 +88,14 @@ public sealed class Recipes(IDbContextFactory<AppDbContext> dbFactory, TimeProvi
             : RecipeDeleteResult.NotFound;
     }
 
-    public async Task<int> LogAsync(DateOnly date, Meal meal, TimeOnly timeEaten, int recipeId, double servings, CancellationToken cancellationToken = default)
+    public async Task<int> LogAsync(DateOnly date, TimeOnly timeEaten, int recipeId, double servings, CancellationToken cancellationToken = default)
     {
         ValidateServings(servings);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var snapshots = await SnapshotsAsync(db, [recipeId], cancellationToken);
         if (!snapshots.TryGetValue(recipeId, out var snapshot))
             throw new ArgumentException($"Recipe {recipeId} doesn't exist.", nameof(recipeId));
-        var entry = NewEntry(date, meal, timeEaten, recipeId, servings, snapshot, time.GetUtcNow().UtcDateTime);
+        var entry = NewEntry(date, timeEaten, recipeId, servings, snapshot, time.GetUtcNow().UtcDateTime);
         db.DiaryEntries.Add(entry);
         await db.SaveChangesAsync(cancellationToken);
         return entry.Id;
@@ -109,17 +109,16 @@ public sealed class Recipes(IDbContextFactory<AppDbContext> dbFactory, TimeProvi
         if (entry is null)
             return null;
         var name = await db.Recipes.Where(r => r.Id == entry.RecipeId).Select(r => r.Name).SingleAsync(cancellationToken);
-        return new RecipeEntryDetails(entry.Id, entry.Date, entry.Meal, entry.TimeEaten, entry.RecipeId!.Value, name, entry.Quantity, PerServing(entry));
+        return new RecipeEntryDetails(entry.Id, entry.Date, entry.TimeEaten, entry.RecipeId!.Value, name, entry.Quantity, PerServing(entry));
     }
 
-    public async Task<bool> UpdateEntryAsync(int entryId, Meal meal, TimeOnly timeEaten, double servings, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateEntryAsync(int entryId, TimeOnly timeEaten, double servings, CancellationToken cancellationToken = default)
     {
         ValidateServings(servings);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var entry = await db.DiaryEntries.FirstOrDefaultAsync(e => e.Id == entryId && e.RecipeId != null, cancellationToken);
         if (entry is null)
             return false;
-        entry.Meal = meal;
         entry.TimeEaten = timeEaten;
         entry.Quantity = servings;
         await db.SaveChangesAsync(cancellationToken);
@@ -129,13 +128,12 @@ public sealed class Recipes(IDbContextFactory<AppDbContext> dbFactory, TimeProvi
     public static IReadOnlyDictionary<string, (double PerServing, bool Complete)> PerServing(DiaryEntry entry) =>
         entry.Nutrients.ToDictionary(n => n.NutrientId, n => (n.PerServing, n.Complete));
 
-    public static DiaryEntry NewEntry(DateOnly date, Meal meal, TimeOnly timeEaten, int recipeId, double servings,
+    public static DiaryEntry NewEntry(DateOnly date, TimeOnly timeEaten, int recipeId, double servings,
         IReadOnlyDictionary<string, (double PerServing, bool Complete)> snapshot, DateTime createdUtc)
     {
         var entry = new DiaryEntry
         {
             Date = date,
-            Meal = meal,
             TimeEaten = timeEaten,
             RecipeId = recipeId,
             Quantity = servings,

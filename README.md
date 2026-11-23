@@ -57,7 +57,7 @@ dotnet ef migrations add <Name> --project src/NutriLog
 - **Portions** per food, e.g. "slice" = 35 g. Imported ones are marked; portions added by hand are never touched by an
   import.
 - **Recipes**: foods with grams, and the number of servings it makes.
-- **Diary entries**: date, meal, and either a food in grams or portions, or a recipe in servings. Check constraints
+- **Diary entries**: date, time eaten, and either a food in grams or portions, or a recipe in servings. Check constraints
   keep these combinations valid. A food or recipe that's in a recipe or the diary can't be deleted, so past days keep
   their numbers. A recipe entry stores the recipe's nutrients per serving as they were when it was logged
   (`DiaryEntryNutrients`), so changing the recipe later only affects new entries, copies included.
