@@ -12,6 +12,14 @@ public static class DiaryUrls
     public static string Add(DateOnly date, int? foodId = null) =>
         $"add?date={Format(date)}" + (foodId is { } id ? $"&food={id}" : "");
 
+    public static string AddAgain(DateOnly date, LoggedAmount logged)
+    {
+        var quantity = logged.Quantity.ToString("R", CultureInfo.InvariantCulture);
+        if (logged.RecipeId is { } recipeId)
+            return $"add?date={Format(date)}&recipe={recipeId}&servings={quantity}";
+        return $"add?date={Format(date)}&food={logged.FoodId}&amount={quantity}" + (logged.PortionId is { } portionId ? $"&portion={portionId}" : "");
+    }
+
     public static string Entry(int entryId) => $"entry/{entryId}";
 
     public static string NewFood(DateOnly date) => $"foods/new?date={Format(date)}";

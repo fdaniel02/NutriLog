@@ -4,7 +4,10 @@ namespace NutriLog.Features.Diary;
 
 public sealed record DiaryDay(DateOnly Date, IReadOnlyList<DiaryItem> Entries, NutrientTotals Totals);
 
-public sealed record DiaryItem(int Id, TimeOnly Time, string Name, string Amount, NutrientTotals Nutrients);
+public sealed record DiaryItem(int Id, TimeOnly Time, string Name, string Amount, NutrientTotals Nutrients, LoggedAmount Logged);
+
+// What an entry logged, to add it again: a food's amount, or a recipe's servings in Quantity.
+public readonly record struct LoggedAmount(int? FoodId, int? RecipeId, double Quantity, int? PortionId);
 
 // Grams, or a number of portions when PortionId is set.
 public readonly record struct EntryAmount(double Quantity, int? PortionId);

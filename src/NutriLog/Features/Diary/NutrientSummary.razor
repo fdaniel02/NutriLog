@@ -18,31 +18,15 @@
     </dl>
     <details class="all-nutrients">
         <summary>All nutrients</summary>
-        @foreach (var group in Nutrients.All.Where(n => !Headline.Contains(n.Id) && n.Id != Nutrients.Energy).GroupBy(n => n.Group))
-        {
-            <table class="nutrient-table">
-                <caption>@GroupName(group.Key)</caption>
-                <tbody>
-                    @foreach (var nutrient in group)
-                    {
-                        <tr>
-                            <th scope="row">@nutrient.Name</th>
-                            <td>@NutrientFormat.WithUnit(Totals[nutrient.Id], nutrient.Unit)@TargetOf(nutrient.Id)</td>
-                        </tr>
-                        @if (BarOf(nutrient.Id) is { } bar)
-                        {
-                            <tr class="bar-row" aria-hidden="true"><td colspan="2">@bar</td></tr>
-                        }
-                    }
-                </tbody>
-            </table>
-        }
+        <NutrientTables Totals="Totals" Targets="Targets" Exclude="TablesExclude" />
         <p class="muted note">≥: some foods have no value for it; ?: none has.</p>
     </details>
 </section>
 
 @code {
     public static readonly IReadOnlyList<string> Headline = [Nutrients.Protein, Nutrients.Carbohydrate, Nutrients.Fat, Nutrients.Fibre];
+
+    static readonly IReadOnlyList<string> TablesExclude = [Nutrients.Energy, .. Headline];
 
     static readonly Dictionary<string, Nutrient> ById = Nutrients.All.ToDictionary(n => n.Id);
 
@@ -56,21 +40,25 @@
     [Parameter]
     public DayTargets? Targets { get; set; }
 
-    RenderFragment? TargetOf(string nutrientId)
+    RenderFragment? TargetOf(string nutrientId) => TargetOf(Targets, Totals, nutrientId);
+
+    RenderFragment? BarOf(string nutrientId) => BarOf(Targets, Totals, nutrientId);
+
+    internal static RenderFragment? TargetOf(DayTargets? targets, NutrientTotals totals, string nutrientId)
     {
-        if (Targets?[nutrientId] is not { } range)
+        if (targets?[nutrientId] is not { } range)
             return null;
-        var status = range.Evaluate(Totals[nutrientId]);
+        var status = range.Evaluate(totals[nutrientId]);
         return @<span class="target @status?.ToString().ToLowerInvariant()">
             <span class="visually-hidden">@StatusText(status), target </span>@range.Describe()
         </span>;
     }
 
-    RenderFragment? BarOf(string nutrientId)
+    internal static RenderFragment? BarOf(DayTargets? targets, NutrientTotals totals, string nutrientId)
     {
-        if (Targets?[nutrientId] is not { } range)
+        if (targets?[nutrientId] is not { } range)
             return null;
-        var bar = TargetBar.For(range, Totals[nutrientId]);
+        var bar = TargetBar.For(range, totals[nutrientId]);
         return @<span class="target-bar @bar.Status?.ToString().ToLowerInvariant()" aria-hidden="true">
             <span class="target-fill" style="width:@Percent(bar.Fill)"></span>
             @if (bar.MinimumMark is { } mark)
@@ -88,11 +76,5 @@
         TargetStatus.Within => "within",
         TargetStatus.Over => "over",
         _ => "not known against"
-    };
-
-    static string GroupName(NutrientGroup group) => group switch
-    {
-        NutrientGroup.FattyAcids => "Fatty acids",
-        _ => group.ToString()
     };
 }
