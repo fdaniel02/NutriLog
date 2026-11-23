@@ -61,7 +61,7 @@ summary { cursor:pointer; }
 .day-title input { width:auto; padding:4px 8px; font-size:0.85rem; color-scheme:dark; }
 
 .summary { display:flex; flex-direction:column; gap:12px; }
-.summary-energy { display:flex; align-items:baseline; gap:6px; }
+.summary-energy { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; }
 .summary-value { font-size:2rem; font-weight:700; }
 .summary-macros { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; margin:0; }
 .summary-macros div { min-width:0; }
@@ -115,6 +115,16 @@ summary { cursor:pointer; }
 .target.under { color:#d29922; }
 .target.within { color:#3fb950; }
 .target.over { color:var(--danger); }
+.target-bar { position:relative; display:block; height:4px; margin-top:3px; border-radius:2px; background:var(--line); overflow:hidden; }
+.target-fill { position:absolute; inset:0 auto 0 0; background:var(--muted); }
+.target-minimum { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--text); opacity:0.6; }
+.target-bar.under .target-fill { background:#d29922; }
+.target-bar.within .target-fill { background:#3fb950; }
+.target-bar.over .target-fill { background:var(--danger); }
+.target-bar.unsure .target-fill { background:repeating-linear-gradient(-45deg, #d29922 0 4px, transparent 4px 7px); }
+.summary-energy .target-bar { flex-basis:100%; margin-top:0; }
+.nutrient-table .bar-row td { border-top:0; padding:0 0 4px; }
+.nutrient-table .bar-row .target-bar { margin-top:0; }
 .run-note { margin:-8px 0 0; font-size:0.85rem; }
 .targets-form { display:flex; flex-direction:column; gap:10px; }
 .targets-form .note { margin:0; }

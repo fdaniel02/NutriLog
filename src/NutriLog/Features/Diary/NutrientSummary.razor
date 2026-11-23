@@ -1,8 +1,10 @@
+@using System.Globalization
 <section class="card summary" aria-label="@Label">
     <div class="summary-energy">
         <span class="summary-value">@NutrientFormat.Total(Totals[Nutrients.Energy])</span>
         <span class="muted">kcal</span>
         @TargetOf(Nutrients.Energy)
+        @BarOf(Nutrients.Energy)
     </div>
     <dl class="summary-macros">
         @foreach (var id in Headline)
@@ -10,7 +12,7 @@
             var nutrient = ById[id];
             <div>
                 <dt>@nutrient.Name</dt>
-                <dd>@NutrientFormat.WithUnit(Totals[id], nutrient.Unit)@TargetOf(id)</dd>
+                <dd>@NutrientFormat.WithUnit(Totals[id], nutrient.Unit)@TargetOf(id)@BarOf(id)</dd>
             </div>
         }
     </dl>
@@ -27,6 +29,10 @@
                             <th scope="row">@nutrient.Name</th>
                             <td>@NutrientFormat.WithUnit(Totals[nutrient.Id], nutrient.Unit)@TargetOf(nutrient.Id)</td>
                         </tr>
+                        @if (BarOf(nutrient.Id) is { } bar)
+                        {
+                            <tr class="bar-row" aria-hidden="true"><td colspan="2">@bar</td></tr>
+                        }
                     }
                 </tbody>
             </table>
@@ -59,6 +65,22 @@
             <span class="visually-hidden">@StatusText(status), target </span>@range.Describe()
         </span>;
     }
+
+    RenderFragment? BarOf(string nutrientId)
+    {
+        if (Targets?[nutrientId] is not { } range)
+            return null;
+        var bar = TargetBar.For(range, Totals[nutrientId]);
+        return @<span class="target-bar @bar.Status?.ToString().ToLowerInvariant()" aria-hidden="true">
+            <span class="target-fill" style="width:@Percent(bar.Fill)"></span>
+            @if (bar.MinimumMark is { } mark)
+            {
+                <span class="target-minimum" style="left:@Percent(mark)"></span>
+            }
+        </span>;
+    }
+
+    static string Percent(double fraction) => (fraction * 100).ToString("0.#", CultureInfo.InvariantCulture) + "%";
 
     static string StatusText(TargetStatus? status) => status switch
     {
