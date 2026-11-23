@@ -28,39 +28,24 @@
         <p class="run-note muted"><a href="targets">Set targets</a> to see the day against them.</p>
     }
 
-    @foreach (var meal in day.Meals)
-    {
-        <section class="card meal" aria-labelledby="meal-@meal.Meal">
-            <header class="meal-header">
-                <h2 id="meal-@meal.Meal">@meal.Meal</h2>
-                @if (meal.Entries.Count > 0)
+    <section class="card day-entries" aria-label="Entries">
+        @if (day.Entries.Count > 0)
+        {
+            <ul class="entries">
+                @foreach (var entry in day.Entries)
                 {
-                    <span class="meal-energy">@NutrientFormat.WithUnit(meal.Totals[Nutrients.Energy], "kcal")</span>
+                    <li>
+                        <a href="@DiaryUrls.Entry(entry.Id)">
+                            <span class="entry-name">@entry.Name</span>
+                            <span class="entry-amount muted">@DiaryUrls.TimeOfDay(entry.Time) · @entry.Amount</span>
+                            <span class="entry-energy">@NutrientFormat.WithUnit(entry.Nutrients[Nutrients.Energy], "kcal")</span>
+                        </a>
+                    </li>
                 }
-            </header>
-            @if (meal.Entries.Count > 0)
-            {
-                <ul class="entries">
-                    @foreach (var entry in meal.Entries)
-                    {
-                        <li>
-                            <a href="@DiaryUrls.Entry(entry.Id)">
-                                <span class="entry-name">@entry.Name</span>
-                                <span class="entry-amount muted">@DiaryUrls.TimeOfDay(entry.Time) · @entry.Amount</span>
-                                <span class="entry-energy">@NutrientFormat.WithUnit(entry.Nutrients[Nutrients.Energy], "kcal")</span>
-                            </a>
-                        </li>
-                    }
-                </ul>
-                <p class="meal-macros muted">
-                    P @NutrientFormat.WithUnit(meal.Totals[Nutrients.Protein], "g") ·
-                    C @NutrientFormat.WithUnit(meal.Totals[Nutrients.Carbohydrate], "g") ·
-                    F @NutrientFormat.WithUnit(meal.Totals[Nutrients.Fat], "g")
-                </p>
-            }
-            <a class="add-link" href="@DiaryUrls.Add(date, meal.Meal)">+ Add food or recipe</a>
-        </section>
-    }
+            </ul>
+        }
+        <a class="add-link" href="@DiaryUrls.Add(date)">+ Add food or recipe</a>
+    </section>
 
     <details class="card copy">
         <summary>Copy from another day</summary>
@@ -68,16 +53,6 @@
             <label>
                 From
                 <input type="date" @bind="copyFrom" />
-            </label>
-            <label>
-                What
-                <select @bind="copyMeal">
-                    <option value="">Whole day</option>
-                    @foreach (var meal in Enum.GetValues<Meal>())
-                    {
-                        <option value="@meal">@meal</option>
-                    }
-                </select>
             </label>
         </div>
         <button type="button" class="button" @onclick="CopyAsync">Copy to @title.ToLowerInvariant()</button>
@@ -98,7 +73,6 @@
     // Null while loading: RunStats may take up to its timeout, and the diary shouldn't wait for it.
     DayTargets? targets;
     DateOnly copyFrom;
-    string copyMeal = "";
     string? copyMessage;
 
     protected override async Task OnParametersSetAsync()
@@ -129,13 +103,11 @@
             copyMessage = "Choose another day to copy from.";
             return;
         }
-        var meal = DiaryUrls.ParseMeal(copyMeal);
-        var copied = await Diary.CopyAsync(copyFrom, date, meal);
-        var what = meal is null ? "" : $" from {meal}";
+        var copied = await Diary.CopyAsync(copyFrom, date);
         var entries = copied == 1 ? "entry" : "entries";
         copyMessage = copied == 0
-            ? $"Nothing to copy{what} on {DiaryUrls.DayTitle(copyFrom, Clock.Today)}."
-            : $"Copied {copied} {entries}{what}.";
+            ? $"Nothing to copy on {DiaryUrls.DayTitle(copyFrom, Clock.Today)}."
+            : $"Copied {copied} {entries}.";
         day = await Diary.GetDayAsync(date);
     }
 }

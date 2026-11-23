@@ -33,24 +33,28 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     NavigationManager Navigation => Services.GetRequiredService<NavigationManager>();
 
     [Fact]
-    public async Task The_day_shows_its_meals_entries_and_totals()
+    public async Task The_day_shows_one_list_of_its_entries_and_totals()
     {
         var data = await SetUpAsync();
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3), ("slice", 35));
-        var entry = await data.Diary.AddEntryAsync(Today, Meal.Breakfast, DiaryData.Noon, bread.Id, new EntryAmount(2, bread.Portions[0].Id), Token);
+        var entry = await data.Diary.AddEntryAsync(Today, DiaryData.Noon, bread.Id, new EntryAmount(2, bread.Portions[0].Id), Token);
+        await data.Diary.AddEntryAsync(Today, new TimeOnly(7, 15), bread.Id, new EntryAmount(100, null), Token);
 
         var page = Render<DayPage>();
 
-        page.WaitForElement(".meal .entries a");
+        page.WaitForElement(".day-entries .entries a");
         Assert.Equal("Today", page.Find("h1").TextContent);
-        Assert.Equal(["Breakfast", "Lunch", "Dinner", "Snack"], page.FindAll(".meal h2").Select(h => h.TextContent));
-        var link = page.Find(".meal .entries a");
-        Assert.Equal(DiaryUrls.Entry(entry), link.GetAttribute("href"));
-        Assert.Equal(["Bread", "12:00 · 2 × slice · 70 g", "175 kcal"], link.Children.Select(c => c.TextContent));
-        Assert.Equal("175", page.Find(".summary-value").TextContent);
+        Assert.Empty(page.FindAll("h2"));
+        var links = page.FindAll(".day-entries .entries a");
+        Assert.Equal(["07:15 · 100 g", "12:00 · 2 × slice · 70 g"], links.Select(l => l.QuerySelector(".entry-amount")!.TextContent));
+        Assert.Equal(DiaryUrls.Entry(entry), links[1].GetAttribute("href"));
+        Assert.Equal(["Bread", "12:00 · 2 × slice · 70 g", "175 kcal"], links[1].Children.Select(c => c.TextContent));
+        Assert.Equal("425", page.Find(".summary-value").TextContent);
         // The first one, sugars, has no value for the bread.
         Assert.Equal("?", page.Find(".nutrient-table td").TextContent);
-        Assert.Equal(DiaryUrls.Add(Today, Meal.Lunch), page.FindAll(".add-link")[1].GetAttribute("href"));
+        var add = Assert.Single(page.FindAll(".add-link"));
+        Assert.Equal("+ Add food or recipe", add.TextContent);
+        Assert.Equal(DiaryUrls.Add(Today), add.GetAttribute("href"));
         Assert.Equal(DiaryUrls.Day(Today.AddDays(-1)), page.Find("a[aria-label='Previous day']").GetAttribute("href"));
     }
 
@@ -77,19 +81,21 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     }
 
     [Fact]
-    public async Task Copies_yesterdays_meal_into_today()
+    public async Task Copies_yesterday_into_today()
     {
         var data = await SetUpAsync();
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
-        await data.Diary.AddEntryAsync(Today.AddDays(-1), Meal.Lunch, DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
+        await data.Diary.AddEntryAsync(Today.AddDays(-1), new TimeOnly(8, 0), bread.Id, new EntryAmount(100, null), Token);
+        await data.Diary.AddEntryAsync(Today.AddDays(-1), DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
         var page = Render<DayPage>();
-        page.WaitForElement(".copy select");
+        page.WaitForElement(".copy .button");
 
-        page.Find(".copy select").Change(nameof(Meal.Lunch));
+        Assert.Empty(page.FindAll(".copy select"));
         page.Find(".copy .button").Click();
 
-        page.WaitForAssertion(() => Assert.Equal("Copied 1 entry from Lunch.", page.Find(".copy-message").TextContent));
-        Assert.Equal("250", page.Find(".summary-value").TextContent);
+        page.WaitForAssertion(() => Assert.Equal("Copied 2 entries.", page.Find(".copy-message").TextContent));
+        Assert.Equal("500", page.Find(".summary-value").TextContent);
+        Assert.Equal(2, page.FindAll(".day-entries .entries a").Count);
     }
 
     [Fact]
@@ -107,16 +113,16 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     [Fact]
     public async Task Search_lists_matches_that_link_to_their_amount_form()
     {
-        var data = await SetUpAsync("add?date=2026-11-22&meal=Lunch");
+        var data = await SetUpAsync("add?date=2026-11-22");
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
         var page = Render<AddPage>();
         page.WaitForAssertion(() => Assert.Equal("Search for a food to add.", page.Find(".search-hint").TextContent));
 
         page.Find("input[type=search]").Input("bre");
 
-        page.WaitForAssertion(() => Assert.Equal(DiaryUrls.Add(Today, Meal.Lunch, bread.Id), page.Find(".matches a").GetAttribute("href")));
+        page.WaitForAssertion(() => Assert.Equal(DiaryUrls.Add(Today, bread.Id), page.Find(".matches a").GetAttribute("href")));
         Assert.Equal("NEVO · 250 kcal/100 g", page.Find(".match-details").TextContent.Trim());
-        Assert.Equal("Add to Lunch", page.Find("h1").TextContent);
+        Assert.Equal("Add to today", page.Find("h1").TextContent);
     }
 
     [Fact]
@@ -124,7 +130,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     {
         var data = await SetUpAsync();
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3), ("slice", 35));
-        Navigation.NavigateTo(DiaryUrls.Add(Today, Meal.Dinner, bread.Id));
+        Navigation.NavigateTo(DiaryUrls.Add(Today, bread.Id));
         var page = Render<AddPage>();
         page.WaitForElement("form.amount-form");
 
@@ -143,7 +149,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
         var day = await data.Diary.GetDayAsync(Today, Token);
-        Assert.Equal([("3 × slice · 105 g", new TimeOnly(8, 5))], day.Meals.Single(m => m.Meal == Meal.Dinner).Entries.Select(e => (e.Amount, e.Time)));
+        Assert.Equal([("3 × slice · 105 g", new TimeOnly(8, 5))], day.Entries.Select(e => (e.Amount, e.Time)));
     }
 
     [Fact]
@@ -151,7 +157,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     {
         var data = await SetUpAsync();
         var bread = await data.AddFoodAsync("Bread", []);
-        Navigation.NavigateTo(DiaryUrls.Add(Today.AddDays(-3), Meal.Lunch, bread.Id));
+        Navigation.NavigateTo(DiaryUrls.Add(Today.AddDays(-3), bread.Id));
 
         var page = Render<AddPage>();
 
@@ -164,7 +170,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     {
         var data = await SetUpAsync();
         var bread = await data.AddFoodAsync("Bread", []);
-        Navigation.NavigateTo(DiaryUrls.Add(Today, Meal.Lunch, bread.Id));
+        Navigation.NavigateTo(DiaryUrls.Add(Today, bread.Id));
         var page = Render<AddPage>();
         page.WaitForElement("form.amount-form");
 
@@ -175,7 +181,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         });
         page.Find("form").Submit();
 
-        Assert.Empty((await data.Diary.GetDayAsync(Today, Token)).Meals.SelectMany(m => m.Entries));
+        Assert.Empty((await data.Diary.GetDayAsync(Today, Token)).Entries);
     }
 
     [Fact]
@@ -183,7 +189,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     {
         var data = await SetUpAsync();
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
-        var id = await data.Diary.AddEntryAsync(Today, Meal.Lunch, DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
+        var id = await data.Diary.AddEntryAsync(Today, DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
         var page = Render<EntryPage>(p => p.Add(e => e.EntryId, id));
         page.WaitForElement("form.amount-form");
 
@@ -191,16 +197,15 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         page.WaitForAssertion(() =>
         {
             page.Find("input[type=number]").Change("50");
-            page.FindAll("form select")[1].Change(nameof(Meal.Snack));
             page.Find("input[type=time]").Change("16:20");
-            Assert.Equal(("50", nameof(Meal.Snack), "16:20"), (page.Find("input[type=number]").GetAttribute("value"),
-                page.FindAll("form select")[1].GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
+            Assert.Equal(("50", "16:20"), (page.Find("input[type=number]").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
         });
+        Assert.Single(page.FindAll("form select"));
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
         var entry = await data.Diary.GetEntryAsync(id, Token);
-        Assert.Equal((Meal.Snack, new TimeOnly(16, 20), new EntryAmount(50, null)), (entry!.Meal, entry.Time, entry.Amount));
+        Assert.Equal((new TimeOnly(16, 20), new EntryAmount(50, null)), (entry!.Time, entry.Amount));
     }
 
     [Fact]
@@ -208,7 +213,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     {
         var data = await SetUpAsync();
         var bread = await data.AddFoodAsync("Bread", []);
-        var id = await data.Diary.AddEntryAsync(Today, Meal.Lunch, DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
+        var id = await data.Diary.AddEntryAsync(Today, DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
         var page = Render<EntryPage>(p => p.Add(e => e.EntryId, id));
         page.WaitForElement("button.danger");
 
@@ -231,7 +236,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     [Fact]
     public async Task A_new_food_is_saved_with_salt_as_sodium_and_then_added()
     {
-        var data = await SetUpAsync("foods/new?date=2026-11-22&meal=Snack");
+        var data = await SetUpAsync("foods/new?date=2026-11-22");
         var page = Render<NewFoodPage>();
         page.WaitForElement("form.food-form");
 
@@ -246,7 +251,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         page.WaitForAssertion(() => Assert.Contains("food=", Navigation.Uri));
         await using var db = await data.Factory.CreateDbContextAsync(Token);
         var food = await db.Foods.Include(f => f.Nutrients).Include(f => f.Portions).SingleAsync(Token);
-        Assert.EndsWith(DiaryUrls.Add(Today, Meal.Snack, food.Id), Navigation.Uri);
+        Assert.EndsWith(DiaryUrls.Add(Today, food.Id), Navigation.Uri);
         Assert.Equal([(Nutrients.Energy, 440.0), ("sodium", 600.0)], food.Nutrients.OrderBy(n => n.NutrientId).Select(n => (n.NutrientId, n.Amount)));
         Assert.Equal(("3 crackers", 20.0), (food.Portions[0].Name, food.Portions[0].Grams));
     }

@@ -35,7 +35,7 @@ public class ScanPageTests : BunitContext
             && path.EndsWith("Features/Barcode/ScanPage.razor.js", StringComparison.Ordinal));
         module.Setup<string>("start", _ => true).SetResult(camera);
         module.SetupVoid("stop").SetVoidResult();
-        Navigation.NavigateTo(BarcodeUrls.Scan(Today, Meal.Lunch));
+        Navigation.NavigateTo(BarcodeUrls.Scan(Today));
         return lookup;
     }
 
@@ -46,11 +46,12 @@ public class ScanPageTests : BunitContext
     {
         var lookup = SetUp(new LookupResult(LookupStatus.Found, 42));
         var page = Render<ScanPage>();
+        Assert.Equal(("‹ Add food", DiaryUrls.Add(Today)), (page.Find(".back-nav a").TextContent, page.Find(".back-nav a").GetAttribute("href")));
 
         page.Find("input[aria-label=Barcode]").Change(" 8712345678906 ");
         page.Find("form").Submit();
 
-        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Add(Today, Meal.Lunch, 42), Navigation.Uri));
+        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Add(Today, 42), Navigation.Uri));
         Assert.Equal(["8712345678906"], lookup.Codes);
     }
 
@@ -63,7 +64,7 @@ public class ScanPageTests : BunitContext
 
         await page.InvokeAsync(() => page.Instance.OnDetected("87123456"));
 
-        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Add(Today, Meal.Lunch, 7), Navigation.Uri));
+        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Add(Today, 7), Navigation.Uri));
         Assert.Equal(["87123456"], lookup.Codes);
     }
 
@@ -77,7 +78,7 @@ public class ScanPageTests : BunitContext
         page.Find("form").Submit();
 
         page.WaitForAssertion(() =>
-            Assert.Equal(FoodUrls.NewWithBarcode(Today, Meal.Lunch, "87123456"), page.Find(".add-link").GetAttribute("href")));
+            Assert.Equal(FoodUrls.NewWithBarcode(Today, "87123456"), page.Find(".add-link").GetAttribute("href")));
         Assert.Contains("doesn't know 87123456", page.Find("p[role=alert]").TextContent);
     }
 

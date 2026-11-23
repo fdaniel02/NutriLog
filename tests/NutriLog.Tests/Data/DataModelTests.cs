@@ -60,7 +60,7 @@ public sealed class DataModelTests(PostgresFixture postgres) : IAsyncLifetime
 
     static DiaryEntry Entry(Action<DiaryEntry> set)
     {
-        var entry = new DiaryEntry { Date = new DateOnly(2026, 11, 22), Meal = Meal.Lunch, Quantity = 1 };
+        var entry = new DiaryEntry { Date = new DateOnly(2026, 11, 22), Quantity = 1 };
         set(entry);
         return entry;
     }

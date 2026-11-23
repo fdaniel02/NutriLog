@@ -8,7 +8,7 @@
 <PageTitle>NutriLog · @Title</PageTitle>
 
 <nav class="back-nav">
-    <a href="@DiaryUrls.Add(date, meal)">‹ Add to @meal</a>
+    <a href="@DiaryUrls.Add(date)">‹ Add food</a>
 </nav>
 <h1>@Title</h1>
 
@@ -117,11 +117,7 @@ else
     [SupplyParameterFromQuery(Name = "date")]
     public string? DateText { get; set; }
 
-    [SupplyParameterFromQuery(Name = "meal")]
-    public string? MealText { get; set; }
-
     DateOnly date;
-    Meal meal;
     string name = "";
     FoodBasis basis = FoodBasis.Grams;
     readonly Dictionary<string, double?> values = Nutrients.All.ToDictionary(n => n.Id, _ => (double?)null);
@@ -142,7 +138,6 @@ else
     protected override async Task OnParametersSetAsync()
     {
         date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
-        meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
         if (FoodId is not { } id)
         {
             barcode = string.IsNullOrWhiteSpace(BarcodeText) ? null : BarcodeText.Trim();
@@ -203,7 +198,7 @@ else
             }
             else
                 id = await Foods.CreateOwnAsync(food);
-            Navigation.NavigateTo(DiaryUrls.Add(date, meal, id));
+            Navigation.NavigateTo(DiaryUrls.Add(date, id));
         }
         catch (InvalidFoodException ex)
         {

@@ -2,11 +2,9 @@ using NutriLog.Data;
 
 namespace NutriLog.Features.Diary;
 
-public sealed record DiaryDay(DateOnly Date, IReadOnlyList<MealGroup> Meals, NutrientTotals Totals);
+public sealed record DiaryDay(DateOnly Date, IReadOnlyList<DiaryItem> Entries, NutrientTotals Totals);
 
-public sealed record MealGroup(Meal Meal, IReadOnlyList<DiaryItem> Entries, NutrientTotals Totals);
-
-public sealed record DiaryItem(int Id, Meal Meal, TimeOnly Time, string Name, string Amount, NutrientTotals Nutrients);
+public sealed record DiaryItem(int Id, TimeOnly Time, string Name, string Amount, NutrientTotals Nutrients);
 
 // Grams, or a number of portions when PortionId is set.
 public readonly record struct EntryAmount(double Quantity, int? PortionId);
@@ -38,4 +36,4 @@ public sealed record FoodChoice(
 
 public sealed record FoodMatch(int Id, string Name, string? NameNl, FoodSource Source, FoodBasis Basis, double? EnergyPer100, bool Recent);
 
-public sealed record EntryDetails(int Id, DateOnly Date, Meal Meal, TimeOnly Time, FoodChoice Food, EntryAmount Amount);
+public sealed record EntryDetails(int Id, DateOnly Date, TimeOnly Time, FoodChoice Food, EntryAmount Amount);

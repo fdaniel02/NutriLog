@@ -6,15 +6,6 @@
             <input type="number" inputmode="decimal" step="any" min="0" required @bind="servings" />
         </label>
         <label>
-            Meal
-            <select @bind="meal">
-                @foreach (var m in Enum.GetValues<Meal>())
-                {
-                    <option value="@m">@m</option>
-                }
-            </select>
-        </label>
-        <label>
             Time
             <input type="time" required @bind="time" @bind:format="HH:mm" />
         </label>
@@ -50,9 +41,6 @@
     [Parameter]
     public double InitialServings { get; set; } = 1;
 
-    [Parameter]
-    public Meal InitialMeal { get; set; }
-
     [Parameter, EditorRequired]
     public TimeOnly InitialTime { get; set; }
 
@@ -60,13 +48,12 @@
     public string SubmitLabel { get; set; } = "Add";
 
     [Parameter]
-    public EventCallback<(Meal Meal, TimeOnly Time, double Servings)> OnSubmit { get; set; }
+    public EventCallback<(TimeOnly Time, double Servings)> OnSubmit { get; set; }
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
     double? servings;
-    Meal meal;
     TimeOnly? time;
     bool busy;
     bool initialised;
@@ -77,7 +64,6 @@
             return;
         initialised = true;
         servings = InitialServings;
-        meal = InitialMeal;
         time = InitialTime;
     }
 
@@ -90,7 +76,7 @@
         busy = true;
         try
         {
-            await OnSubmit.InvokeAsync((meal, eaten, s));
+            await OnSubmit.InvokeAsync((eaten, s));
         }
         finally
         {

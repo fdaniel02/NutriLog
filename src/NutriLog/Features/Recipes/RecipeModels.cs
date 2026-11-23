@@ -22,7 +22,7 @@ public sealed record RecipeDetails(int Id, string Name, double Servings, IReadOn
 
 public sealed record RecipeMatch(int Id, string Name, double Servings, NutrientTotal EnergyPerServing);
 
-public sealed record RecipeEntryDetails(int Id, DateOnly Date, Meal Meal, TimeOnly Time, int RecipeId, string RecipeName, double Servings,
+public sealed record RecipeEntryDetails(int Id, DateOnly Date, TimeOnly Time, int RecipeId, string RecipeName, double Servings,
     IReadOnlyDictionary<string, (double PerServing, bool Complete)> PerServing)
 {
     public NutrientTotals Nutrients(double servings) => NutrientTotals.ForServings(PerServing, servings);

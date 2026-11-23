@@ -9,12 +9,11 @@ public interface IDiary
     // Foods used in the last weeks first, most often used first; an empty query returns only those.
     Task<IReadOnlyList<FoodMatch>> SearchFoodsAsync(string? query, CancellationToken cancellationToken = default);
     Task<FoodChoice?> GetFoodAsync(int foodId, CancellationToken cancellationToken = default);
-    Task<int> AddEntryAsync(DateOnly date, Meal meal, TimeOnly timeEaten, int foodId, EntryAmount amount, CancellationToken cancellationToken = default);
+    Task<int> AddEntryAsync(DateOnly date, TimeOnly timeEaten, int foodId, EntryAmount amount, CancellationToken cancellationToken = default);
     Task<EntryDetails?> GetEntryAsync(int entryId, CancellationToken cancellationToken = default);
-    Task<bool> UpdateEntryAsync(int entryId, Meal meal, TimeOnly timeEaten, EntryAmount amount, CancellationToken cancellationToken = default);
+    Task<bool> UpdateEntryAsync(int entryId, TimeOnly timeEaten, EntryAmount amount, CancellationToken cancellationToken = default);
     Task<bool> DeleteEntryAsync(int entryId, CancellationToken cancellationToken = default);
-    // Copies one meal, or the whole day when meal is null, into the same meals on another day.
-    Task<int> CopyAsync(DateOnly from, DateOnly to, Meal? meal, CancellationToken cancellationToken = default);
+    Task<int> CopyAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken = default);
 }
 
 public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock, TimeProvider time) : IDiary
@@ -37,18 +36,13 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         var items = entries.Select(e =>
         {
             if (e.RecipeId is { } recipeId)
-                return new DiaryItem(e.Id, e.Meal, e.TimeEaten, recipeNames[recipeId], NutrientFormat.Servings(e.Quantity),
+                return new DiaryItem(e.Id, e.TimeEaten, recipeNames[recipeId], NutrientFormat.Servings(e.Quantity),
                     NutrientTotals.ForServings(Recipes.Recipes.PerServing(e), e.Quantity));
             var food = foods[e.FoodId!.Value];
             var amount = AmountOf(e);
-            return new DiaryItem(e.Id, e.Meal, e.TimeEaten, food.Name, food.Describe(amount), food.Nutrients(amount));
+            return new DiaryItem(e.Id, e.TimeEaten, food.Name, food.Describe(amount), food.Nutrients(amount));
         }).ToList();
-        var meals = Enum.GetValues<Meal>().Select(meal =>
-        {
-            var inMeal = items.Where(i => i.Meal == meal).ToList();
-            return new MealGroup(meal, inMeal, NutrientTotals.Sum(inMeal.Select(i => i.Nutrients)));
-        }).ToList();
-        return new DiaryDay(date, meals, NutrientTotals.Sum(items.Select(i => i.Nutrients)));
+        return new DiaryDay(date, items, NutrientTotals.Sum(items.Select(i => i.Nutrients)));
     }
 
     public async Task<IReadOnlyList<FoodMatch>> SearchFoodsAsync(string? query, CancellationToken cancellationToken = default)
@@ -113,11 +107,11 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         return last is null ? food : food with { LastAmount = AmountOf(last) };
     }
 
-    public async Task<int> AddEntryAsync(DateOnly date, Meal meal, TimeOnly timeEaten, int foodId, EntryAmount amount, CancellationToken cancellationToken = default)
+    public async Task<int> AddEntryAsync(DateOnly date, TimeOnly timeEaten, int foodId, EntryAmount amount, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await ValidateAsync(db, foodId, amount, cancellationToken);
-        var entry = new DiaryEntry { Date = date, Meal = meal, TimeEaten = timeEaten, FoodId = foodId, CreatedUtc = time.GetUtcNow().UtcDateTime };
+        var entry = new DiaryEntry { Date = date, TimeEaten = timeEaten, FoodId = foodId, CreatedUtc = time.GetUtcNow().UtcDateTime };
         Apply(entry, amount);
         db.DiaryEntries.Add(entry);
         await db.SaveChangesAsync(cancellationToken);
@@ -132,17 +126,16 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
             return null;
         var foodId = entry.FoodId!.Value;
         var foods = await LoadFoodsAsync(db, [foodId], cancellationToken);
-        return new EntryDetails(entry.Id, entry.Date, entry.Meal, entry.TimeEaten, foods[foodId], AmountOf(entry));
+        return new EntryDetails(entry.Id, entry.Date, entry.TimeEaten, foods[foodId], AmountOf(entry));
     }
 
-    public async Task<bool> UpdateEntryAsync(int entryId, Meal meal, TimeOnly timeEaten, EntryAmount amount, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateEntryAsync(int entryId, TimeOnly timeEaten, EntryAmount amount, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var entry = await db.DiaryEntries.FirstOrDefaultAsync(e => e.Id == entryId && e.FoodId != null, cancellationToken);
         if (entry is null)
             return false;
         await ValidateAsync(db, entry.FoodId!.Value, amount, cancellationToken);
-        entry.Meal = meal;
         entry.TimeEaten = timeEaten;
         Apply(entry, amount);
         await db.SaveChangesAsync(cancellationToken);
@@ -155,13 +148,13 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         return await db.DiaryEntries.Where(e => e.Id == entryId).ExecuteDeleteAsync(cancellationToken) > 0;
     }
 
-    public async Task<int> CopyAsync(DateOnly from, DateOnly to, Meal? meal, CancellationToken cancellationToken = default)
+    public async Task<int> CopyAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
     {
         if (from == to)
             throw new ArgumentException("Copy from another day than the one copied to.", nameof(from));
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var source = await db.DiaryEntries.AsNoTracking()
-            .Where(e => e.Date == from && (meal == null || e.Meal == meal))
+            .Where(e => e.Date == from)
             .OrderBy(e => e.CreatedUtc).ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
         var now = time.GetUtcNow().UtcDateTime;
@@ -169,11 +162,10 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         var snapshots = await Recipes.Recipes.SnapshotsAsync(db,
             source.Where(e => e.RecipeId != null).Select(e => e.RecipeId!.Value).Distinct().ToList(), cancellationToken);
         db.DiaryEntries.AddRange(source.Select(e => e.RecipeId is { } recipeId
-            ? Recipes.Recipes.NewEntry(to, e.Meal, e.TimeEaten, recipeId, e.Quantity, snapshots[recipeId], now)
+            ? Recipes.Recipes.NewEntry(to, e.TimeEaten, recipeId, e.Quantity, snapshots[recipeId], now)
             : new DiaryEntry
             {
                 Date = to,
-                Meal = e.Meal,
                 TimeEaten = e.TimeEaten,
                 FoodId = e.FoodId,
                 Quantity = e.Quantity,

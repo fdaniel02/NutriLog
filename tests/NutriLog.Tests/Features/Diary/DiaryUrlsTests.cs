@@ -23,8 +23,8 @@ public class DiaryUrlsTests
     public void Builds_the_urls()
     {
         Assert.Equal(
-            ["?date=2026-11-22", "add?date=2026-11-22&meal=Lunch", "add?date=2026-11-22&meal=Lunch&food=7", "entry/3", "foods/new?date=2026-11-22&meal=Snack"],
-            [DiaryUrls.Day(Today), DiaryUrls.Add(Today, Meal.Lunch), DiaryUrls.Add(Today, Meal.Lunch, 7), DiaryUrls.Entry(3), DiaryUrls.NewFood(Today, Meal.Snack)]);
+            ["?date=2026-11-22", "add?date=2026-11-22", "add?date=2026-11-22&food=7", "entry/3", "foods/new?date=2026-11-22"],
+            [DiaryUrls.Day(Today), DiaryUrls.Add(Today), DiaryUrls.Add(Today, 7), DiaryUrls.Entry(3), DiaryUrls.NewFood(Today)]);
     }
 
     [Theory]
@@ -34,16 +34,6 @@ public class DiaryUrlsTests
     public void Parses_only_iso_dates(string? text, bool valid)
     {
         Assert.Equal(valid ? Today : null, DiaryUrls.ParseDate(text));
-    }
-
-    [Theory]
-    [InlineData("lunch", Meal.Lunch)]
-    [InlineData("Snack", Meal.Snack)]
-    [InlineData("7", null)]
-    [InlineData("brunch", null)]
-    public void Parses_meals(string text, Meal? expected)
-    {
-        Assert.Equal(expected, DiaryUrls.ParseMeal(text));
     }
 
     [Theory]

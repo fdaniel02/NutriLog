@@ -9,7 +9,7 @@
 <PageTitle>NutriLog · Scan</PageTitle>
 
 <nav class="back-nav">
-    <a href="@DiaryUrls.Add(date, meal)">‹ Add to @meal</a>
+    <a href="@DiaryUrls.Add(date)">‹ Add food</a>
 </nav>
 <h1>Scan a barcode</h1>
 
@@ -32,11 +32,11 @@
             break;
         case LookupStatus.NotFound:
             <p role="alert">Open Food Facts doesn't know @looked up.</p>
-            <a class="add-link" href="@FoodUrls.NewWithBarcode(date, meal, looked!)">+ Add it from the label</a>
+            <a class="add-link" href="@FoodUrls.NewWithBarcode(date, looked!)">+ Add it from the label</a>
             break;
         case LookupStatus.Unavailable:
             <p class="form-error" role="alert">Open Food Facts can't be reached right now. Try again, or add the food from its label.</p>
-            <a class="add-link" href="@FoodUrls.NewWithBarcode(date, meal, looked!)">+ Add it from the label</a>
+            <a class="add-link" href="@FoodUrls.NewWithBarcode(date, looked!)">+ Add it from the label</a>
             break;
     }
 </section>
@@ -45,11 +45,7 @@
     [SupplyParameterFromQuery(Name = "date")]
     public string? DateText { get; set; }
 
-    [SupplyParameterFromQuery(Name = "meal")]
-    public string? MealText { get; set; }
-
     DateOnly date;
-    Meal meal;
     ElementReference video;
     IJSObjectReference? module;
     DotNetObjectReference<ScanPage>? self;
@@ -71,7 +67,6 @@
     protected override void OnParametersSet()
     {
         date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
-        meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -112,7 +107,7 @@
             looked = code.Trim();
             result = await Lookup.LookupAsync(looked);
             if (result is { Status: LookupStatus.Found, FoodId: { } id })
-                Navigation.NavigateTo(DiaryUrls.Add(date, meal, id));
+                Navigation.NavigateTo(DiaryUrls.Add(date, id));
         }
         finally
         {
