@@ -90,7 +90,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             {
                 t.HasCheckConstraint("CK_DiaryEntries_FoodOrRecipe", "(\"FoodId\" IS NULL) <> (\"RecipeId\" IS NULL)");
                 t.HasCheckConstraint("CK_DiaryEntries_Portion", "(\"QuantityUnit\" = 'Portion') = (\"PortionId\" IS NOT NULL)");
-                t.HasCheckConstraint("CK_DiaryEntries_Servings", "(\"QuantityUnit\" = 'Servings') = (\"RecipeId\" IS NOT NULL)");
+                t.HasCheckConstraint("CK_DiaryEntries_Servings", "\"QuantityUnit\" <> 'Servings' OR \"RecipeId\" IS NOT NULL");
+                t.HasCheckConstraint("CK_DiaryEntries_RecipeUnit", "\"RecipeId\" IS NULL OR \"QuantityUnit\" IN ('Servings', 'Grams')");
+                // For a food entry the comparison with NULL is NULL, which the check lets through.
+                t.HasCheckConstraint("CK_DiaryEntries_ServingGrams", "(\"ServingGrams\" IS NOT NULL) = (\"RecipeId\" IS NOT NULL) AND \"ServingGrams\" > 0");
                 t.HasCheckConstraint("CK_DiaryEntries_Quantity", "\"Quantity\" > 0");
             });
         });

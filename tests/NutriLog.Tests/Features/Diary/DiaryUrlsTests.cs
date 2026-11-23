@@ -31,9 +31,11 @@ public class DiaryUrlsTests
     public void Builds_the_urls_to_add_an_entry_again()
     {
         Assert.Equal(
-            ["add?date=2026-11-22&food=7&amount=2&portion=4", "add?date=2026-11-22&food=7&amount=12.5", "add?date=2026-11-22&recipe=3&servings=1.5"],
+            ["add?date=2026-11-22&food=7&amount=2&portion=4", "add?date=2026-11-22&food=7&amount=12.5", "add?date=2026-11-22&recipe=3&servings=1.5",
+                "add?date=2026-11-22&recipe=3&grams=180"],
             [DiaryUrls.AddAgain(Today, new LoggedAmount(7, null, 2, 4)), DiaryUrls.AddAgain(Today, new LoggedAmount(7, null, 12.5, null)),
-                DiaryUrls.AddAgain(Today, new LoggedAmount(null, 3, 1.5, null))]);
+                DiaryUrls.AddAgain(Today, new LoggedAmount(null, 3, 1.5, null)),
+                DiaryUrls.AddAgain(Today, new LoggedAmount(null, 3, 180, null, NutriLog.Features.Recipes.RecipeUnit.Grams))]);
     }
 
     [Theory]

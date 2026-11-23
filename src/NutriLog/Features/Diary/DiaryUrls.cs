@@ -16,7 +16,7 @@ public static class DiaryUrls
     {
         var quantity = logged.Quantity.ToString("R", CultureInfo.InvariantCulture);
         if (logged.RecipeId is { } recipeId)
-            return $"add?date={Format(date)}&recipe={recipeId}&servings={quantity}";
+            return $"add?date={Format(date)}&recipe={recipeId}&{(logged.RecipeUnit == Recipes.RecipeUnit.Grams ? "grams" : "servings")}={quantity}";
         return $"add?date={Format(date)}&food={logged.FoodId}&amount={quantity}" + (logged.PortionId is { } portionId ? $"&portion={portionId}" : "");
     }
 

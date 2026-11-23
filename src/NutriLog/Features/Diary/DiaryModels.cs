@@ -6,8 +6,9 @@ public sealed record DiaryDay(DateOnly Date, IReadOnlyList<DiaryItem> Entries, N
 
 public sealed record DiaryItem(int Id, TimeOnly Time, string Name, string Amount, NutrientTotals Nutrients, LoggedAmount Logged);
 
-// What an entry logged, to add it again: a food's amount, or a recipe's servings in Quantity.
-public readonly record struct LoggedAmount(int? FoodId, int? RecipeId, double Quantity, int? PortionId);
+// What an entry logged, to add it again: a food's amount, or a recipe's servings or grams in Quantity.
+public readonly record struct LoggedAmount(int? FoodId, int? RecipeId, double Quantity, int? PortionId,
+    Recipes.RecipeUnit RecipeUnit = Recipes.RecipeUnit.Servings);
 
 // Grams, or a number of portions when PortionId is set.
 public readonly record struct EntryAmount(double Quantity, int? PortionId);

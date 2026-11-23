@@ -13,7 +13,7 @@
         <a href="@DiaryUrls.Day(recipeEntry.Date)">‹ @DiaryUrls.DayTitle(recipeEntry.Date, Clock.Today)</a>
     </nav>
     <h1>Edit entry</h1>
-    <ServingsForm Name="@recipeEntry.RecipeName" PerServing="recipeEntry.PerServing" InitialServings="recipeEntry.Servings"
+    <ServingsForm Name="@recipeEntry.RecipeName" Snapshot="recipeEntry.Snapshot" InitialAmount="recipeEntry.Amount"
                   InitialTime="recipeEntry.Time" SubmitLabel="Save" OnSubmit="SaveRecipeAsync">
         <button type="button" class="button danger" @onclick="DeleteAsync">Delete</button>
     </ServingsForm>
@@ -59,9 +59,9 @@ else
         Navigation.NavigateTo(DiaryUrls.Day(entry!.Date));
     }
 
-    async Task SaveRecipeAsync((TimeOnly Time, double Servings) input)
+    async Task SaveRecipeAsync((TimeOnly Time, RecipeAmount Amount) input)
     {
-        await Recipes.UpdateEntryAsync(EntryId, input.Time, input.Servings);
+        await Recipes.UpdateEntryAsync(EntryId, input.Time, input.Amount);
         Navigation.NavigateTo(DiaryUrls.Day(recipeEntry!.Date));
     }
 

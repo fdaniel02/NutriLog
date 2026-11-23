@@ -117,6 +117,9 @@ namespace NutriLog.Migrations
                     b.Property<int?>("RecipeId")
                         .HasColumnType("integer");
 
+                    b.Property<double?>("ServingGrams")
+                        .HasColumnType("double precision");
+
                     b.Property<TimeOnly>("TimeEaten")
                         .HasColumnType("time without time zone");
 
@@ -138,7 +141,11 @@ namespace NutriLog.Migrations
 
                             t.HasCheckConstraint("CK_DiaryEntries_Quantity", "\"Quantity\" > 0");
 
-                            t.HasCheckConstraint("CK_DiaryEntries_Servings", "(\"QuantityUnit\" = 'Servings') = (\"RecipeId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_DiaryEntries_RecipeUnit", "\"RecipeId\" IS NULL OR \"QuantityUnit\" IN ('Servings', 'Grams')");
+
+                            t.HasCheckConstraint("CK_DiaryEntries_ServingGrams", "(\"ServingGrams\" IS NOT NULL) = (\"RecipeId\" IS NOT NULL) AND \"ServingGrams\" > 0");
+
+                            t.HasCheckConstraint("CK_DiaryEntries_Servings", "\"QuantityUnit\" <> 'Servings' OR \"RecipeId\" IS NOT NULL");
                         });
                 });
 
