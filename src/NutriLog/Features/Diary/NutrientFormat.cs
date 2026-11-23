@@ -21,6 +21,9 @@ public static class NutrientFormat
         return amount == "1" ? "1 serving" : $"{amount} servings";
     }
 
+    public static string Macros(NutrientTotals totals) =>
+        $"P {WithUnit(totals[Data.Nutrients.Protein], "g")} · C {WithUnit(totals[Data.Nutrients.Carbohydrate], "g")} · F {WithUnit(totals[Data.Nutrients.Fat], "g")}";
+
     public static string WithUnit(NutrientTotal total, string unit) =>
         total.Unknown ? "?" : $"{Total(total)} {unit}";
 }

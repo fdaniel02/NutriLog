@@ -1,0 +1,36 @@
+@foreach (var group in Nutrients.All.Where(n => !Exclude.Contains(n.Id)).GroupBy(n => n.Group))
+{
+    <table class="nutrient-table">
+        <caption>@GroupName(group.Key)</caption>
+        <tbody>
+            @foreach (var nutrient in group)
+            {
+                <tr>
+                    <th scope="row">@nutrient.Name</th>
+                    <td>@NutrientFormat.WithUnit(Totals[nutrient.Id], nutrient.Unit)@NutrientSummary.TargetOf(Targets, Totals, nutrient.Id)</td>
+                </tr>
+                @if (NutrientSummary.BarOf(Targets, Totals, nutrient.Id) is { } bar)
+                {
+                    <tr class="bar-row" aria-hidden="true"><td colspan="2">@bar</td></tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public NutrientTotals Totals { get; set; } = NutrientTotals.Empty;
+
+    [Parameter]
+    public DayTargets? Targets { get; set; }
+
+    [Parameter]
+    public IReadOnlyCollection<string> Exclude { get; set; } = [];
+
+    static string GroupName(NutrientGroup group) => group switch
+    {
+        NutrientGroup.FattyAcids => "Fatty acids",
+        _ => group.ToString()
+    };
+}

@@ -223,6 +223,24 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
         var day = await s.Data.Diary.GetDayAsync(Today, Token);
         Assert.Equal([("Porridge", "1.5 servings", new TimeOnly(10, 0))], day.Entries.Select(e => (e.Name, e.Amount, e.Time)));
+        Assert.Equal(new LoggedAmount(null, id, 1.5, null), day.Entries[0].Logged);
+    }
+
+    [Theory]
+    [InlineData(1.5, "1.5")]
+    [InlineData(0, "1")]
+    public async Task Adding_a_recipe_again_starts_at_the_entrys_servings(double servings, string expected)
+    {
+        var s = await SetUpAsync();
+        var id = await s.Recipes.CreateAsync(Porridge(s), Token);
+        Navigation.NavigateTo(DiaryUrls.AddAgain(Today, new LoggedAmount(null, id, servings, null)));
+
+        var page = Render<AddPage>();
+
+        page.WaitForElement("form.amount-form");
+        Assert.Equal(expected, page.Find("input[type=number]").GetAttribute("value"));
+        Assert.Equal($"Nutrition for {NutrientFormat.Servings(double.Parse(expected, System.Globalization.CultureInfo.InvariantCulture))}",
+            page.Find(".nutrition h2").TextContent);
     }
 
     [Fact]

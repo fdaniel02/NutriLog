@@ -211,7 +211,7 @@ public class TargetsPagesTests(PostgresFixture postgres) : BunitContext
 
         var page = Render<DayPage>();
 
-        page.WaitForElement(".day-entries .entries a");
+        page.WaitForElement(".day-entries .entry-link");
         Assert.Empty(page.FindAll(".target"));
         Assert.Empty(page.FindAll(".run-note"));
 

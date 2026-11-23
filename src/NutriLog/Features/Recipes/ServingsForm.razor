@@ -30,6 +30,10 @@
         @ChildContent
     </div>
 </form>
+@if (Servings is { } shown)
+{
+    <NutritionCard Totals="NutrientTotals.ForServings(PerServing, shown)" Caption="@NutrientFormat.Servings(shown)" />
+}
 
 @code {
     [Parameter, EditorRequired]

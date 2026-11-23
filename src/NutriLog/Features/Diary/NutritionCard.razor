@@ -1,0 +1,76 @@
+@using System.Globalization
+<section class="card nutrition" aria-labelledby="nutrition-heading">
+    <h2 id="nutrition-heading">Nutrition for @Caption</h2>
+    <div class="energy-split">
+        @if (Segments().ToList() is { Count: > 0 } segments)
+        {
+            <svg class="energy-donut" viewBox="0 0 120 120" role="img" aria-label="@Energy kcal">
+                <circle class="donut-track" cx="60" cy="60" r="@Radius" />
+                @foreach (var (macro, start, length) in segments)
+                {
+                    <circle class="donut-segment macro-@macro.NutrientId" cx="60" cy="60" r="@Radius" pathLength="100"
+                            stroke-dasharray="@Number(length) @Number(100 - length)" stroke-dashoffset="@Number(-start)"
+                            transform="rotate(-90 60 60)" />
+                }
+                <text class="donut-value" x="60" y="58" text-anchor="middle">@Energy</text>
+                <text class="donut-unit" x="60" y="76" text-anchor="middle">kcal</text>
+            </svg>
+        }
+        else
+        {
+            <p class="energy-only"><span class="summary-value">@Energy</span> <span class="muted">kcal</span></p>
+        }
+        <ul class="macro-legend">
+            @foreach (var macro in macros)
+            {
+                <li class="macro-@macro.NutrientId">
+                    <span class="macro-name">@Label(macro)</span>
+                    <span class="macro-grams">@NutrientFormat.WithUnit(macro.Grams, "g")</span>
+                </li>
+            }
+        </ul>
+    </div>
+    <details class="all-nutrients">
+        <summary>All nutrients</summary>
+        <NutrientTables Totals="Totals" Exclude="TablesExclude" />
+    </details>
+</section>
+
+@code {
+    const double Radius = 50;
+    // Between segments, in hundredths of the circle.
+    const double Gap = 1.5;
+
+    static readonly IReadOnlyList<string> TablesExclude = [Nutrients.Energy, Nutrients.Protein, Nutrients.Carbohydrate, Nutrients.Fat];
+
+    [Parameter, EditorRequired]
+    public NutrientTotals Totals { get; set; } = NutrientTotals.Empty;
+
+    [Parameter, EditorRequired]
+    public string Caption { get; set; } = "";
+
+    IReadOnlyList<MacroShare> macros = [];
+
+    string Energy => NutrientFormat.Total(Totals[Nutrients.Energy]);
+
+    protected override void OnParametersSet() => macros = MacroEnergy.Split(Totals);
+
+    IEnumerable<(MacroShare Macro, double Start, double Length)> Segments()
+    {
+        var shown = macros.Where(m => m.Share > 0).ToList();
+        var gap = shown.Count > 1 ? Gap : 0;
+        var start = 0.0;
+        foreach (var macro in shown)
+        {
+            var length = macro.Share!.Value * 100;
+            yield return (macro, start, Math.Max(length - gap, 0.5));
+            start += length;
+        }
+    }
+
+    static string Number(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    static string Label(MacroShare macro) => macro.Share is { } share ? $"{macro.Name} ({Percent(share)})" : macro.Name;
+
+    static string Percent(double share) => (share * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
+}

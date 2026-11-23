@@ -37,10 +37,11 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         {
             if (e.RecipeId is { } recipeId)
                 return new DiaryItem(e.Id, e.TimeEaten, recipeNames[recipeId], NutrientFormat.Servings(e.Quantity),
-                    NutrientTotals.ForServings(Recipes.Recipes.PerServing(e), e.Quantity));
+                    NutrientTotals.ForServings(Recipes.Recipes.PerServing(e), e.Quantity), new LoggedAmount(null, recipeId, e.Quantity, null));
             var food = foods[e.FoodId!.Value];
             var amount = AmountOf(e);
-            return new DiaryItem(e.Id, e.TimeEaten, food.Name, food.Describe(amount), food.Nutrients(amount));
+            return new DiaryItem(e.Id, e.TimeEaten, food.Name, food.Describe(amount), food.Nutrients(amount),
+                new LoggedAmount(food.Id, null, amount.Quantity, amount.PortionId));
         }).ToList();
         return new DiaryDay(date, items, NutrientTotals.Sum(items.Select(i => i.Nutrients)));
     }

@@ -35,11 +35,13 @@
                 @foreach (var entry in day.Entries)
                 {
                     <li>
-                        <a href="@DiaryUrls.Entry(entry.Id)">
+                        <a class="entry-link" href="@DiaryUrls.Entry(entry.Id)">
                             <span class="entry-name">@entry.Name</span>
                             <span class="entry-amount muted">@DiaryUrls.TimeOfDay(entry.Time) · @entry.Amount</span>
+                            <span class="entry-macros muted">@NutrientFormat.Macros(entry.Nutrients)</span>
                             <span class="entry-energy">@NutrientFormat.WithUnit(entry.Nutrients[Nutrients.Energy], "kcal")</span>
                         </a>
+                        <a class="add-again" href="@DiaryUrls.AddAgain(date, entry.Logged)" aria-label="Add @entry.Name again" title="Add again">+</a>
                     </li>
                 }
             </ul>

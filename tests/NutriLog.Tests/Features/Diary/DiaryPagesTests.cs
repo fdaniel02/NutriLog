@@ -42,13 +42,17 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
 
         var page = Render<DayPage>();
 
-        page.WaitForElement(".day-entries .entries a");
+        page.WaitForElement(".day-entries .entry-link");
         Assert.Equal("Today", page.Find("h1").TextContent);
         Assert.Empty(page.FindAll("h2"));
-        var links = page.FindAll(".day-entries .entries a");
+        var links = page.FindAll(".day-entries .entry-link");
         Assert.Equal(["07:15 · 100 g", "12:00 · 2 × slice · 70 g"], links.Select(l => l.QuerySelector(".entry-amount")!.TextContent));
         Assert.Equal(DiaryUrls.Entry(entry), links[1].GetAttribute("href"));
-        Assert.Equal(["Bread", "12:00 · 2 × slice · 70 g", "175 kcal"], links[1].Children.Select(c => c.TextContent));
+        Assert.Equal(["Bread", "12:00 · 2 × slice · 70 g", "P 6.3 g · C 32 g · F 2.1 g", "175 kcal"], links[1].Children.Select(c => c.TextContent));
+        Assert.Equal(
+            [DiaryUrls.AddAgain(Today, new LoggedAmount(bread.Id, null, 100, null)), DiaryUrls.AddAgain(Today, new LoggedAmount(bread.Id, null, 2, bread.Portions[0].Id))],
+            page.FindAll(".add-again").Select(a => a.GetAttribute("href")));
+        Assert.Equal("Add Bread again", page.Find(".add-again").GetAttribute("aria-label"));
         Assert.Equal("425", page.Find(".summary-value").TextContent);
         // The first one, sugars, has no value for the bread.
         Assert.Equal("?", page.Find(".nutrient-table td").TextContent);
@@ -95,7 +99,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
 
         page.WaitForAssertion(() => Assert.Equal("Copied 2 entries.", page.Find(".copy-message").TextContent));
         Assert.Equal("500", page.Find(".summary-value").TextContent);
-        Assert.Equal(2, page.FindAll(".day-entries .entries a").Count);
+        Assert.Equal(2, page.FindAll(".day-entries .entry-link").Count);
     }
 
     [Fact]
@@ -164,6 +168,80 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         page.WaitForElement("form.amount-form");
         Assert.Equal("10:00", page.Find("input[type=time]").GetAttribute("value"));
     }
+
+    [Fact]
+    public async Task Adding_again_starts_at_the_entrys_amount_and_unit()
+    {
+        var data = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3), ("slice", 35));
+        await data.Diary.AddEntryAsync(Today, DiaryData.Noon, bread.Id, new EntryAmount(80, null), Token);
+        Navigation.NavigateTo(DiaryUrls.AddAgain(Today, new LoggedAmount(bread.Id, null, 3, bread.Portions[0].Id)));
+
+        var page = Render<AddPage>();
+
+        page.WaitForElement("form.amount-form");
+        Assert.Equal(("3", bread.Portions[0].Id.ToString(System.Globalization.CultureInfo.InvariantCulture), "10:00"),
+            (page.Find("input[type=number]").GetAttribute("value"), page.Find("form select").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
+    }
+
+    [Theory]
+    [InlineData("&amount=3&portion=999999")]
+    [InlineData("&amount=0")]
+    [InlineData("&amount=-2")]
+    public async Task Adding_again_with_an_amount_that_does_not_fit_starts_at_the_last_one(string query)
+    {
+        var data = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", [], ("slice", 35));
+        await data.Diary.AddEntryAsync(Today, DiaryData.Noon, bread.Id, new EntryAmount(80, null), Token);
+        Navigation.NavigateTo(DiaryUrls.Add(Today, bread.Id) + query);
+
+        var page = Render<AddPage>();
+
+        page.WaitForElement("form.amount-form");
+        Assert.Equal(("80", ""), (page.Find("input[type=number]").GetAttribute("value"), page.Find("form select").GetAttribute("value")));
+    }
+
+    [Fact]
+    public async Task The_form_shows_the_nutrition_of_the_amount_with_the_energy_split()
+    {
+        var data = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 10, 40, 4), ("slice", 35));
+        var id = await data.Diary.AddEntryAsync(Today, DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
+        var page = Render<EntryPage>(p => p.Add(e => e.EntryId, id));
+        page.WaitForElement(".nutrition");
+
+        // 10 g protein and 40 g carbohydrate at 4 kcal, 4 g fat at 9: 40 + 160 + 36 = 236 kcal from macros.
+        Assert.Equal("Nutrition for 100 g", page.Find(".nutrition h2").TextContent);
+        Assert.Equal(["Protein (17%) 10 g", "Carbohydrate (68%) 40 g", "Fat (15%) 4 g"],
+            page.FindAll(".macro-legend li").Select(li => Squeezed(li.TextContent)));
+        Assert.Equal(3, page.FindAll(".donut-segment").Count);
+        Assert.Equal("250 kcal", page.Find(".energy-donut").GetAttribute("aria-label"));
+        Assert.DoesNotContain(page.FindAll(".nutrition .nutrient-table th"), th => th.TextContent is "Protein" or "Energy");
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=number]").Change("50");
+            Assert.Equal("Nutrition for 50 g", page.Find(".nutrition h2").TextContent);
+        });
+        Assert.Equal("125 kcal", page.Find(".energy-donut").GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public async Task Without_macros_there_is_no_chart()
+    {
+        var data = await SetUpAsync();
+        var tea = await data.AddFoodAsync("Tea", new Dictionary<string, double> { [Nutrients.Energy] = 1 });
+        var id = await data.Diary.AddEntryAsync(Today, DiaryData.Noon, tea.Id, new EntryAmount(200, null), Token);
+
+        var page = Render<EntryPage>(p => p.Add(e => e.EntryId, id));
+
+        page.WaitForElement(".nutrition");
+        Assert.Empty(page.FindAll(".energy-donut"));
+        Assert.Equal("2 kcal", Squeezed(page.Find(".energy-only").TextContent));
+        Assert.Equal(["Protein ?", "Carbohydrate ?", "Fat ?"], page.FindAll(".macro-legend li").Select(li => Squeezed(li.TextContent)));
+    }
+
+    static string Squeezed(string text) => string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     [Fact]
     public async Task An_empty_time_disables_adding()
