@@ -110,6 +110,17 @@ public class ScanPageTests : BunitContext
     }
 
     [Fact]
+    public void The_camera_gets_the_app_s_own_decoder_for_browsers_without_one()
+    {
+        SetUp(new LookupResult(LookupStatus.NotFound), "started");
+
+        Render<ScanPage>();
+
+        var start = Assert.Single(module.Invocations, i => i.Identifier == "start");
+        Assert.Equal(["./lib/barcode-detector/ponyfill.js", "./lib/barcode-detector/zxing_reader.wasm"], start.Arguments.Skip(2));
+    }
+
+    [Fact]
     public async Task Leaving_the_page_stops_the_camera()
     {
         SetUp(new LookupResult(LookupStatus.NotFound), "started");

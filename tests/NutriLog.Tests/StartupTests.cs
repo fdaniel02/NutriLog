@@ -58,6 +58,20 @@ public sealed class StartupTests : IDisposable
         Assert.Contains("<h1>Not found</h1>", html);
     }
 
+    [Theory]
+    [InlineData("/lib/barcode-detector/ponyfill.js", "text/javascript")]
+    [InlineData("/lib/barcode-detector/zxing-exported.js", "text/javascript")]
+    [InlineData("/lib/barcode-detector/zxing_reader.wasm", "application/wasm")]
+    public async Task Serves_the_barcode_decoder_itself(string path, string mediaType)
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(mediaType, response.Content.Headers.ContentType?.MediaType);
+    }
+
     [Fact]
     public void Logs_are_json_and_skip_ef_core_sql_commands()
     {
