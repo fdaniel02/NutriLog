@@ -62,20 +62,26 @@ public sealed class Recipes(IDbContextFactory<AppDbContext> dbFactory, TimeProvi
 
     public async Task<bool> UpdateAsync(int recipeId, RecipeInput recipe, CancellationToken cancellationToken = default)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var entity = await db.Recipes.FirstOrDefaultAsync(r => r.Id == recipeId, cancellationToken);
-        if (entity is null)
-            return false;
-        var (name, ingredients) = await ValidateAsync(db, recipe, cancellationToken);
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        await db.RecipeIngredients.Where(i => i.RecipeId == recipeId).ExecuteDeleteAsync(cancellationToken);
-        entity.Name = name;
-        entity.Servings = recipe.Servings;
-        entity.UpdatedUtc = time.GetUtcNow().UtcDateTime;
-        db.RecipeIngredients.AddRange(ingredients.Select(i => new RecipeIngredient { RecipeId = recipeId, FoodId = i.FoodId, Grams = i.Grams }));
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return true;
+        await using var strategyContext = await dbFactory.CreateDbContextAsync(cancellationToken);
+        // The pages' DbContext retries on failure, which only works with the whole transaction inside the strategy,
+        // on a fresh DbContext per attempt.
+        return await strategyContext.Database.CreateExecutionStrategy().ExecuteAsync(async ct =>
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var entity = await db.Recipes.FirstOrDefaultAsync(r => r.Id == recipeId, ct);
+            if (entity is null)
+                return false;
+            var (name, ingredients) = await ValidateAsync(db, recipe, ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await db.RecipeIngredients.Where(i => i.RecipeId == recipeId).ExecuteDeleteAsync(ct);
+            entity.Name = name;
+            entity.Servings = recipe.Servings;
+            entity.UpdatedUtc = time.GetUtcNow().UtcDateTime;
+            db.RecipeIngredients.AddRange(ingredients.Select(i => new RecipeIngredient { RecipeId = recipeId, FoodId = i.FoodId, Grams = i.Grams }));
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return true;
+        }, cancellationToken);
     }
 
     public async Task<RecipeDeleteResult> DeleteAsync(int recipeId, CancellationToken cancellationToken = default)

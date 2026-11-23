@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using NutriLog.Data;
 using NutriLog.Features.Diary;
 using NutriLog.Features.Recipes;
@@ -90,6 +91,27 @@ public class RecipesTests(PostgresFixture postgres)
         Assert.Equal(("Oat bowl", 1.0), (recipe!.Name, recipe.Servings));
         Assert.Equal([(s.Oats.Id, 80.0)], recipe.Ingredients.Select(i => (i.FoodId, i.Grams)));
         Assert.False(await s.Recipes.UpdateAsync(-1, Porridge(s), Token));
+    }
+
+    [Fact]
+    public async Task An_update_works_with_the_pages_retrying_database()
+    {
+        var s = await SetUpAsync();
+        var id = await s.Recipes.CreateAsync(Porridge(s), Token);
+        string connectionString;
+        await using (var db = await s.Data.Factory.CreateDbContextAsync(Token))
+            connectionString = db.Database.GetConnectionString()!;
+        var retrying = new PooledDbContextFactory<AppDbContext>(new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure()).Options);
+        var recipes = new NutriLog.Features.Recipes.Recipes(retrying, s.Data.Time);
+
+        Assert.True(await recipes.UpdateAsync(id, Porridge(s, servings: 4), Token));
+
+        var recipe = await s.Recipes.GetAsync(id, Token);
+        Assert.Equal(4.0, recipe!.Servings);
+        Assert.Equal(2, recipe.Ingredients.Count);
+        Assert.False(await recipes.UpdateAsync(-1, Porridge(s), Token));
+        await Assert.ThrowsAsync<InvalidRecipeException>(() => recipes.UpdateAsync(id, Porridge(s, servings: 0), Token));
     }
 
     [Fact]
