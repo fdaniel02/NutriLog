@@ -15,13 +15,13 @@
 
 @if (recipe is not null)
 {
-    <ServingsForm Name="@recipe.Name" PerServing="recipe.Snapshot" InitialMeal="meal" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
+    <ServingsForm Name="@recipe.Name" PerServing="recipe.Snapshot" InitialMeal="meal" InitialTime="now" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
         <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
     </ServingsForm>
 }
 else if (food is not null)
 {
-    <AmountForm Food="food" InitialMeal="meal" SubmitLabel="Add" OnSubmit="AddAsync">
+    <AmountForm Food="food" InitialMeal="meal" InitialTime="now" SubmitLabel="Add" OnSubmit="AddAsync">
         <a class="button" href="@DiaryUrls.Add(date, meal)">Other food</a>
         @if (NutriLog.Features.Foods.Foods.IsEditable(food.Source))
         {
@@ -91,6 +91,7 @@ else
 
     DateOnly date;
     Meal meal;
+    TimeOnly now;
     FoodChoice? food;
     RecipeDetails? recipe;
     IReadOnlyList<RecipeMatch>? recipeMatches;
@@ -102,6 +103,7 @@ else
     {
         date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
         meal = DiaryUrls.ParseMeal(MealText) ?? Meal.Breakfast;
+        now = Clock.Now;
         food = FoodId is { } id ? await Diary.GetFoodAsync(id) : null;
         recipe = RecipeId is { } recipeId ? await Recipes.GetAsync(recipeId) : null;
         if (food is null && recipe is null && matches is null)
@@ -119,15 +121,15 @@ else
             (matches, recipeMatches) = (found, foundRecipes);
     }
 
-    async Task AddAsync((Meal Meal, EntryAmount Amount) input)
+    async Task AddAsync((Meal Meal, TimeOnly Time, EntryAmount Amount) input)
     {
-        await Diary.AddEntryAsync(date, input.Meal, food!.Id, input.Amount);
+        await Diary.AddEntryAsync(date, input.Meal, input.Time, food!.Id, input.Amount);
         Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 
-    async Task AddRecipeAsync((Meal Meal, double Servings) input)
+    async Task AddRecipeAsync((Meal Meal, TimeOnly Time, double Servings) input)
     {
-        await Recipes.LogAsync(date, input.Meal, recipe!.Id, input.Servings);
+        await Recipes.LogAsync(date, input.Meal, input.Time, recipe!.Id, input.Servings);
         Navigation.NavigateTo(DiaryUrls.Day(date));
     }
 

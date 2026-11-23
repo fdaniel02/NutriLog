@@ -9,9 +9,9 @@ public interface IDiary
     // Foods used in the last weeks first, most often used first; an empty query returns only those.
     Task<IReadOnlyList<FoodMatch>> SearchFoodsAsync(string? query, CancellationToken cancellationToken = default);
     Task<FoodChoice?> GetFoodAsync(int foodId, CancellationToken cancellationToken = default);
-    Task<int> AddEntryAsync(DateOnly date, Meal meal, int foodId, EntryAmount amount, CancellationToken cancellationToken = default);
+    Task<int> AddEntryAsync(DateOnly date, Meal meal, TimeOnly timeEaten, int foodId, EntryAmount amount, CancellationToken cancellationToken = default);
     Task<EntryDetails?> GetEntryAsync(int entryId, CancellationToken cancellationToken = default);
-    Task<bool> UpdateEntryAsync(int entryId, Meal meal, EntryAmount amount, CancellationToken cancellationToken = default);
+    Task<bool> UpdateEntryAsync(int entryId, Meal meal, TimeOnly timeEaten, EntryAmount amount, CancellationToken cancellationToken = default);
     Task<bool> DeleteEntryAsync(int entryId, CancellationToken cancellationToken = default);
     // Copies one meal, or the whole day when meal is null, into the same meals on another day.
     Task<int> CopyAsync(DateOnly from, DateOnly to, Meal? meal, CancellationToken cancellationToken = default);
@@ -28,7 +28,7 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         var entries = await db.DiaryEntries.AsNoTracking()
             .Where(e => e.Date == date)
             .Include(e => e.Nutrients)
-            .OrderBy(e => e.CreatedUtc).ThenBy(e => e.Id)
+            .OrderBy(e => e.TimeEaten).ThenBy(e => e.CreatedUtc).ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
         var foods = await LoadFoodsAsync(db, entries.Where(e => e.FoodId != null).Select(e => e.FoodId!.Value).Distinct().ToList(), cancellationToken);
         var recipeIds = entries.Where(e => e.RecipeId != null).Select(e => e.RecipeId!.Value).Distinct().ToList();
@@ -37,11 +37,11 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         var items = entries.Select(e =>
         {
             if (e.RecipeId is { } recipeId)
-                return new DiaryItem(e.Id, e.Meal, recipeNames[recipeId], NutrientFormat.Servings(e.Quantity),
+                return new DiaryItem(e.Id, e.Meal, e.TimeEaten, recipeNames[recipeId], NutrientFormat.Servings(e.Quantity),
                     NutrientTotals.ForServings(Recipes.Recipes.PerServing(e), e.Quantity));
             var food = foods[e.FoodId!.Value];
             var amount = AmountOf(e);
-            return new DiaryItem(e.Id, e.Meal, food.Name, food.Describe(amount), food.Nutrients(amount));
+            return new DiaryItem(e.Id, e.Meal, e.TimeEaten, food.Name, food.Describe(amount), food.Nutrients(amount));
         }).ToList();
         var meals = Enum.GetValues<Meal>().Select(meal =>
         {
@@ -113,11 +113,11 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         return last is null ? food : food with { LastAmount = AmountOf(last) };
     }
 
-    public async Task<int> AddEntryAsync(DateOnly date, Meal meal, int foodId, EntryAmount amount, CancellationToken cancellationToken = default)
+    public async Task<int> AddEntryAsync(DateOnly date, Meal meal, TimeOnly timeEaten, int foodId, EntryAmount amount, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await ValidateAsync(db, foodId, amount, cancellationToken);
-        var entry = new DiaryEntry { Date = date, Meal = meal, FoodId = foodId, CreatedUtc = time.GetUtcNow().UtcDateTime };
+        var entry = new DiaryEntry { Date = date, Meal = meal, TimeEaten = timeEaten, FoodId = foodId, CreatedUtc = time.GetUtcNow().UtcDateTime };
         Apply(entry, amount);
         db.DiaryEntries.Add(entry);
         await db.SaveChangesAsync(cancellationToken);
@@ -132,10 +132,10 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
             return null;
         var foodId = entry.FoodId!.Value;
         var foods = await LoadFoodsAsync(db, [foodId], cancellationToken);
-        return new EntryDetails(entry.Id, entry.Date, entry.Meal, foods[foodId], AmountOf(entry));
+        return new EntryDetails(entry.Id, entry.Date, entry.Meal, entry.TimeEaten, foods[foodId], AmountOf(entry));
     }
 
-    public async Task<bool> UpdateEntryAsync(int entryId, Meal meal, EntryAmount amount, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateEntryAsync(int entryId, Meal meal, TimeOnly timeEaten, EntryAmount amount, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var entry = await db.DiaryEntries.FirstOrDefaultAsync(e => e.Id == entryId && e.FoodId != null, cancellationToken);
@@ -143,6 +143,7 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
             return false;
         await ValidateAsync(db, entry.FoodId!.Value, amount, cancellationToken);
         entry.Meal = meal;
+        entry.TimeEaten = timeEaten;
         Apply(entry, amount);
         await db.SaveChangesAsync(cancellationToken);
         return true;
@@ -168,11 +169,12 @@ public sealed class Diary(IDbContextFactory<AppDbContext> dbFactory, Clock clock
         var snapshots = await Recipes.Recipes.SnapshotsAsync(db,
             source.Where(e => e.RecipeId != null).Select(e => e.RecipeId!.Value).Distinct().ToList(), cancellationToken);
         db.DiaryEntries.AddRange(source.Select(e => e.RecipeId is { } recipeId
-            ? Recipes.Recipes.NewEntry(to, e.Meal, recipeId, e.Quantity, snapshots[recipeId], now)
+            ? Recipes.Recipes.NewEntry(to, e.Meal, e.TimeEaten, recipeId, e.Quantity, snapshots[recipeId], now)
             : new DiaryEntry
             {
                 Date = to,
                 Meal = e.Meal,
+                TimeEaten = e.TimeEaten,
                 FoodId = e.FoodId,
                 Quantity = e.Quantity,
                 QuantityUnit = e.QuantityUnit,

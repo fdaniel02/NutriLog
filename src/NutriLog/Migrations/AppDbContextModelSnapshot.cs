@@ -123,6 +123,9 @@ namespace NutriLog.Migrations
                     b.Property<int?>("RecipeId")
                         .HasColumnType("integer");
 
+                    b.Property<TimeOnly>("TimeEaten")
+                        .HasColumnType("time without time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Date");

@@ -14,6 +14,10 @@
                 }
             </select>
         </label>
+        <label>
+            Time
+            <input type="time" required @bind="time" @bind:format="HH:mm" />
+        </label>
     </div>
     @if (Servings is { } s)
     {
@@ -31,7 +35,7 @@
         <p class="amount-preview muted">Enter a number of servings above 0.</p>
     }
     <div class="form-actions">
-        <button type="submit" class="button primary" disabled="@(Servings is null || busy)">@SubmitLabel</button>
+        <button type="submit" class="button primary" disabled="@(Servings is null || time is null || busy)">@SubmitLabel</button>
         @ChildContent
     </div>
 </form>
@@ -49,17 +53,21 @@
     [Parameter]
     public Meal InitialMeal { get; set; }
 
+    [Parameter, EditorRequired]
+    public TimeOnly InitialTime { get; set; }
+
     [Parameter]
     public string SubmitLabel { get; set; } = "Add";
 
     [Parameter]
-    public EventCallback<(Meal Meal, double Servings)> OnSubmit { get; set; }
+    public EventCallback<(Meal Meal, TimeOnly Time, double Servings)> OnSubmit { get; set; }
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
     double? servings;
     Meal meal;
+    TimeOnly? time;
     bool busy;
     bool initialised;
 
@@ -70,18 +78,19 @@
         initialised = true;
         servings = InitialServings;
         meal = InitialMeal;
+        time = InitialTime;
     }
 
     double? Servings => servings is { } s && s > 0 && double.IsFinite(s) ? s : null;
 
     async Task SubmitAsync()
     {
-        if (Servings is not { } s || busy)
+        if (Servings is not { } s || time is not { } eaten || busy)
             return;
         busy = true;
         try
         {
-            await OnSubmit.InvokeAsync((meal, s));
+            await OnSubmit.InvokeAsync((meal, eaten, s));
         }
         finally
         {

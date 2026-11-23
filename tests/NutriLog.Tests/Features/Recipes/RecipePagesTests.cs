@@ -156,7 +156,7 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        await s.Recipes.LogAsync(Today, Meal.Breakfast, id, 1, Token);
+        await s.Recipes.LogAsync(Today, Meal.Breakfast, DiaryData.Noon, id, 1, Token);
         var page = Render<RecipeEditPage>(p => p.Add(r => r.RecipeId, id));
         page.WaitForElement("button.danger");
 
@@ -222,7 +222,7 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
         var lunch = (await s.Data.Diary.GetDayAsync(Today, Token)).Meals.Single(m => m.Meal == Meal.Lunch);
-        Assert.Equal([("Porridge", "1.5 servings")], lunch.Entries.Select(e => (e.Name, e.Amount)));
+        Assert.Equal([("Porridge", "1.5 servings", new TimeOnly(10, 0))], lunch.Entries.Select(e => (e.Name, e.Amount, e.Time)));
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        var entryId = await s.Recipes.LogAsync(Today, Meal.Breakfast, id, 1, Token);
+        var entryId = await s.Recipes.LogAsync(Today, Meal.Breakfast, DiaryData.Noon, id, 1, Token);
         await s.Recipes.UpdateAsync(id, Porridge(s) with { Servings = 1 }, Token);
         var page = Render<EntryPage>(p => p.Add(e => e.EntryId, entryId));
         page.WaitForElement("form.amount-form");
@@ -257,13 +257,15 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         {
             page.Find("input[type=number]").Change("2");
             page.Find("select").Change(nameof(Meal.Dinner));
-            Assert.Equal(("2", nameof(Meal.Dinner)), (page.Find("input[type=number]").GetAttribute("value"), page.Find("select").GetAttribute("value")));
+            page.Find("input[type=time]").Change("18:40");
+            Assert.Equal(("2", nameof(Meal.Dinner), "18:40"), (page.Find("input[type=number]").GetAttribute("value"),
+                page.Find("select").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
         });
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
         var entry = await s.Recipes.GetEntryAsync(entryId, Token);
-        Assert.Equal((Meal.Dinner, 2.0), (entry!.Meal, entry.Servings));
+        Assert.Equal((Meal.Dinner, new TimeOnly(18, 40), 2.0), (entry!.Meal, entry.Time, entry.Servings));
     }
 
     [Fact]
@@ -271,7 +273,7 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        var entryId = await s.Recipes.LogAsync(Today, Meal.Breakfast, id, 1, Token);
+        var entryId = await s.Recipes.LogAsync(Today, Meal.Breakfast, DiaryData.Noon, id, 1, Token);
         var page = Render<EntryPage>(p => p.Add(e => e.EntryId, entryId));
         page.WaitForElement("button.danger");
 
