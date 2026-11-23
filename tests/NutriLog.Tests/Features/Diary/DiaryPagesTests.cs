@@ -138,16 +138,17 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<AddPage>();
         page.WaitForElement("form.amount-form");
 
-        Assert.Equal("10:00", page.Find("input[type=time]").GetAttribute("value"));
+        Assert.Equal("10:00:00", page.Find("input[type=time]").GetAttribute("value"));
 
         page.WaitForAssertion(() =>
         {
             page.Find("input[type=number]").Change("3");
             page.FindAll("form select")[0].Change(bread.Portions[0].Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            page.Find("input[type=time]").Change("08:05");
+            // Blazor's script in the browser sends a time input's value with seconds.
+            page.Find("input[type=time]").Change("08:05:00");
             Assert.StartsWith("3 × slice · 105 g: 263 kcal",
                 string.Join(' ', page.Find(".amount-preview").TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)));
-            Assert.Equal("08:05", page.Find("input[type=time]").GetAttribute("value"));
+            Assert.Equal("08:05:00", page.Find("input[type=time]").GetAttribute("value"));
         });
         page.Find("form").Submit();
 
@@ -166,7 +167,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<AddPage>();
 
         page.WaitForElement("form.amount-form");
-        Assert.Equal("10:00", page.Find("input[type=time]").GetAttribute("value"));
+        Assert.Equal("10:00:00", page.Find("input[type=time]").GetAttribute("value"));
     }
 
     [Fact]
@@ -180,7 +181,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<AddPage>();
 
         page.WaitForElement("form.amount-form");
-        Assert.Equal(("3", bread.Portions[0].Id.ToString(System.Globalization.CultureInfo.InvariantCulture), "10:00"),
+        Assert.Equal(("3", bread.Portions[0].Id.ToString(System.Globalization.CultureInfo.InvariantCulture), "10:00:00"),
             (page.Find("input[type=number]").GetAttribute("value"), page.Find("form select").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
     }
 
@@ -271,12 +272,12 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
         var page = Render<EntryPage>(p => p.Add(e => e.EntryId, id));
         page.WaitForElement("form.amount-form");
 
-        Assert.Equal("12:00", page.Find("input[type=time]").GetAttribute("value"));
+        Assert.Equal("12:00:00", page.Find("input[type=time]").GetAttribute("value"));
         page.WaitForAssertion(() =>
         {
             page.Find("input[type=number]").Change("50");
-            page.Find("input[type=time]").Change("16:20");
-            Assert.Equal(("50", "16:20"), (page.Find("input[type=number]").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
+            page.Find("input[type=time]").Change("16:20:00");
+            Assert.Equal(("50", "16:20:00"), (page.Find("input[type=number]").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
         });
         Assert.Single(page.FindAll("form select"));
         page.Find("form").Submit();

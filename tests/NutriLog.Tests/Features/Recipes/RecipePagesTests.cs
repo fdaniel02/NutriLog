@@ -274,8 +274,9 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         page.WaitForAssertion(() =>
         {
             page.Find("input[type=number]").Change("2");
-            page.Find("input[type=time]").Change("18:40");
-            Assert.Equal(("2", "18:40"), (page.Find("input[type=number]").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
+            // Blazor's script in the browser sends a time input's value with seconds.
+            page.Find("input[type=time]").Change("18:40:00");
+            Assert.Equal(("2", "18:40:00"), (page.Find("input[type=number]").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
         });
         Assert.Empty(page.FindAll("select"));
         page.Find("form").Submit();
