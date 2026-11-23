@@ -146,9 +146,15 @@ else
             ? new EntryAmount(q, PortionId)
             : null;
 
-    RecipeAmount InitialRecipeAmount =>
-        Grams is { } g && double.IsFinite(g) && g > 0 ? RecipeAmount.InGrams(g)
-        : RecipeAmount.InServings(Servings is { } s && double.IsFinite(s) && s > 0 ? s : 1);
+    RecipeAmount InitialRecipeAmount
+    {
+        get
+        {
+            if (Grams is { } g && double.IsFinite(g) && g > 0)
+                return RecipeAmount.InGrams(g);
+            return RecipeAmount.InServings(Servings is { } s && double.IsFinite(s) && s > 0 ? s : 1);
+        }
+    }
 
     public static string Details(FoodMatch match)
     {
