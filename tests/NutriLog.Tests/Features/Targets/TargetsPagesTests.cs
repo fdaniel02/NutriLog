@@ -128,6 +128,55 @@ public class TargetsPagesTests(PostgresFixture postgres) : BunitContext
     }
 
     [Fact]
+    public async Task The_day_shows_a_bar_for_each_nutrient_with_a_target()
+    {
+        var (data, targets) = await SetUpAsync(new FakeRunStats(_ => new RunDay(1, 10, 500, 0)));
+        await targets.SaveAsync(
+        [
+            new NutrientTarget { NutrientId = Nutrients.Energy, Minimum = 2400, Maximum = 2600 },
+            new NutrientTarget { NutrientId = Nutrients.Protein, Minimum = 10 },
+            new NutrientTarget { NutrientId = Nutrients.Fat, Maximum = 1 },
+            new NutrientTarget { NutrientId = "sodium", Maximum = 2300 }
+        ], Token);
+        var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
+        await data.Diary.AddEntryAsync(Today, Meal.Breakfast, DiaryData.Noon, bread.Id, new EntryAmount(200, null), Token);
+
+        var page = Render<DayPage>();
+
+        page.WaitForElement(".summary-energy .target-bar");
+        Assert.Equal(4, page.FindAll(".target-bar").Count);
+        Assert.All(page.FindAll(".target-bar"), bar => Assert.Equal("true", bar.GetAttribute("aria-hidden")));
+        // 500 of 2900–3100 kcal.
+        var energy = page.Find(".summary-energy .target-bar");
+        Assert.Equal(["target-bar", "under"], energy.ClassList);
+        Assert.Equal("width:16.1%", energy.QuerySelector(".target-fill")!.GetAttribute("style"));
+        Assert.Equal("left:93.5%", energy.QuerySelector(".target-minimum")!.GetAttribute("style"));
+        var macros = page.FindAll(".summary-macros .target-bar");
+        Assert.Equal(["target-bar within", "target-bar over"], macros.Select(b => b.ClassName));
+        Assert.All(macros, bar => Assert.Equal("width:100%", bar.QuerySelector(".target-fill")!.GetAttribute("style")));
+        Assert.All(macros, bar => Assert.Null(bar.QuerySelector(".target-minimum")));
+        // The bread has no sodium value.
+        var sodium = page.Find(".nutrient-table .bar-row .target-bar");
+        Assert.Equal("target-bar", string.Join(' ', sodium.ClassList));
+        Assert.Equal("width:0%", sodium.QuerySelector(".target-fill")!.GetAttribute("style"));
+        Assert.Equal("2", page.Find(".nutrient-table .bar-row td").GetAttribute("colspan"));
+    }
+
+    [Fact]
+    public async Task Without_targets_the_day_has_no_bars()
+    {
+        var (data, _) = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
+        await data.Diary.AddEntryAsync(Today, Meal.Breakfast, DiaryData.Noon, bread.Id, new EntryAmount(200, null), Token);
+
+        var page = Render<DayPage>();
+
+        page.WaitForElement(".run-note a");
+        Assert.Empty(page.FindAll(".target-bar"));
+        Assert.Empty(page.FindAll(".bar-row"));
+    }
+
+    [Fact]
     public async Task Without_runstats_the_day_says_it_uses_the_base_targets()
     {
         var (_, targets) = await SetUpAsync(new FakeRunStats(_ => (RunDay?)null));
