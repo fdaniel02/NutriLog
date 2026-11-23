@@ -109,7 +109,7 @@ public class TargetsPagesTests(PostgresFixture postgres) : BunitContext
             new NutrientTarget { NutrientId = "sodium", Maximum = 2300 }
         ], Token);
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
-        await data.Diary.AddEntryAsync(Today, Meal.Breakfast, bread.Id, new EntryAmount(200, null), Token);
+        await data.Diary.AddEntryAsync(Today, Meal.Breakfast, DiaryData.Noon, bread.Id, new EntryAmount(200, null), Token);
 
         var page = Render<DayPage>();
 
@@ -158,7 +158,7 @@ public class TargetsPagesTests(PostgresFixture postgres) : BunitContext
         var (data, targets) = await SetUpAsync(new FakeRunStats(_ => runs.Task));
         await targets.SaveAsync([new NutrientTarget { NutrientId = Nutrients.Energy, Minimum = 2400 }], Token);
         var bread = await data.AddFoodAsync("Bread", DiaryData.Macros(250, 9, 45, 3));
-        await data.Diary.AddEntryAsync(Today, Meal.Breakfast, bread.Id, new EntryAmount(100, null), Token);
+        await data.Diary.AddEntryAsync(Today, Meal.Breakfast, DiaryData.Noon, bread.Id, new EntryAmount(100, null), Token);
 
         var page = Render<DayPage>();
 

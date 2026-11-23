@@ -46,6 +46,14 @@ public class DiaryUrlsTests
         Assert.Equal(expected, DiaryUrls.ParseMeal(text));
     }
 
+    [Theory]
+    [InlineData(7, 5, "07:05")]
+    [InlineData(19, 30, "19:30")]
+    public void Shows_the_time_of_day_in_24_hours(int hour, int minute, string expected)
+    {
+        Assert.Equal(expected, DiaryUrls.TimeOfDay(new TimeOnly(hour, minute)));
+    }
+
     [Fact]
     public void Today_is_in_the_configured_time_zone()
     {
@@ -54,5 +62,18 @@ public class DiaryUrlsTests
         var clock = new Clock(TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam"), time);
 
         Assert.Equal(new DateOnly(2026, 11, 23), clock.Today);
+    }
+
+    [Theory]
+    [InlineData(2026, 11, 22, 23, 30, 45, 0, 30)]
+    [InlineData(2026, 7, 1, 6, 15, 59, 8, 15)]
+    public void Now_is_the_time_of_day_in_the_configured_time_zone_in_whole_minutes(
+        int year, int month, int day, int hourUtc, int minute, int second, int expectedHour, int expectedMinute)
+    {
+        var time = new FakeTimeProvider(new DateTimeOffset(year, month, day, hourUtc, minute, second, TimeSpan.Zero));
+
+        var clock = new Clock(TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam"), time);
+
+        Assert.Equal(new TimeOnly(expectedHour, expectedMinute), clock.Now);
     }
 }

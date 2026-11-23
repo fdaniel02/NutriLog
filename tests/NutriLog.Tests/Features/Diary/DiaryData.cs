@@ -9,6 +9,7 @@ namespace NutriLog.Tests.Features.Diary;
 public sealed class DiaryData
 {
     public static readonly DateOnly Today = new(2026, 11, 22);
+    public static readonly TimeOnly Noon = new(12, 0);
 
     public required IDbContextFactory<AppDbContext> Factory { get; init; }
     public required FakeTimeProvider Time { get; init; }

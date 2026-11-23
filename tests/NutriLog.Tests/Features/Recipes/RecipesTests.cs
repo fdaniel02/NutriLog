@@ -112,10 +112,10 @@ public class RecipesTests(PostgresFixture postgres)
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        await s.Recipes.LogAsync(Today, Meal.Breakfast, id, 1.5, Token);
+        await s.Recipes.LogAsync(Today, Meal.Breakfast, DiaryData.Noon, id, 1.5, Token);
 
         await s.Recipes.UpdateAsync(id, Porridge(s, oats: 200), Token);
-        var later = await s.Recipes.LogAsync(Today, Meal.Snack, id, 1, Token);
+        var later = await s.Recipes.LogAsync(Today, Meal.Snack, DiaryData.Noon, id, 1, Token);
 
         var day = await s.Data.Diary.GetDayAsync(Today, Token);
         var breakfast = day.Meals.Single(m => m.Meal == Meal.Breakfast).Entries.Single();
@@ -133,17 +133,20 @@ public class RecipesTests(PostgresFixture postgres)
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        var entryId = await s.Recipes.LogAsync(Today, Meal.Breakfast, id, 1, Token);
+        var entryId = await s.Recipes.LogAsync(Today, Meal.Breakfast, DiaryData.Noon, id, 1, Token);
         await s.Recipes.UpdateAsync(id, Porridge(s, oats: 200), Token);
 
-        Assert.True(await s.Recipes.UpdateEntryAsync(entryId, Meal.Lunch, 2, Token));
+        var logged = await s.Recipes.GetEntryAsync(entryId, Token);
+        Assert.True(await s.Recipes.UpdateEntryAsync(entryId, Meal.Lunch, new TimeOnly(13, 15), 2, Token));
 
         var entry = await s.Recipes.GetEntryAsync(entryId, Token);
-        Assert.Equal((Today, Meal.Lunch, id, "Porridge", 2.0), (entry!.Date, entry.Meal, entry.RecipeId, entry.RecipeName, entry.Servings));
+        Assert.Equal(DiaryData.Noon, logged!.Time);
+        Assert.Equal((Today, Meal.Lunch, new TimeOnly(13, 15), id, "Porridge", 2.0),
+            (entry!.Date, entry.Meal, entry.Time, entry.RecipeId, entry.RecipeName, entry.Servings));
         // Still the recipe as it was logged.
         Assert.Equal(610, entry.Nutrients(entry.Servings)[Nutrients.Energy].Amount, 6);
         Assert.Null(await s.Data.Diary.GetEntryAsync(entryId, Token));
-        Assert.False(await s.Recipes.UpdateEntryAsync(-1, Meal.Lunch, 2, Token));
+        Assert.False(await s.Recipes.UpdateEntryAsync(-1, Meal.Lunch, DiaryData.Noon, 2, Token));
 
         Assert.True(await s.Data.Diary.DeleteEntryAsync(entryId, Token));
         Assert.Null(await s.Recipes.GetEntryAsync(entryId, Token));
@@ -155,10 +158,10 @@ public class RecipesTests(PostgresFixture postgres)
     public async Task A_food_entry_is_not_a_recipe_entry()
     {
         var s = await SetUpAsync();
-        var entryId = await s.Data.Diary.AddEntryAsync(Today, Meal.Lunch, s.Oats.Id, new EntryAmount(50, null), Token);
+        var entryId = await s.Data.Diary.AddEntryAsync(Today, Meal.Lunch, DiaryData.Noon, s.Oats.Id, new EntryAmount(50, null), Token);
 
         Assert.Null(await s.Recipes.GetEntryAsync(entryId, Token));
-        Assert.False(await s.Recipes.UpdateEntryAsync(entryId, Meal.Lunch, 2, Token));
+        Assert.False(await s.Recipes.UpdateEntryAsync(entryId, Meal.Lunch, DiaryData.Noon, 2, Token));
     }
 
     [Fact]
@@ -167,9 +170,9 @@ public class RecipesTests(PostgresFixture postgres)
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, Meal.Lunch, id, 0, Token));
-        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, Meal.Lunch, -1, 1, Token));
-        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.UpdateEntryAsync(1, Meal.Lunch, double.PositiveInfinity, Token));
+        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, Meal.Lunch, DiaryData.Noon, id, 0, Token));
+        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.LogAsync(Today, Meal.Lunch, DiaryData.Noon, -1, 1, Token));
+        await Assert.ThrowsAsync<ArgumentException>(() => s.Recipes.UpdateEntryAsync(1, Meal.Lunch, DiaryData.Noon, double.PositiveInfinity, Token));
     }
 
     [Fact]
@@ -177,14 +180,15 @@ public class RecipesTests(PostgresFixture postgres)
     {
         var s = await SetUpAsync();
         var id = await s.Recipes.CreateAsync(Porridge(s), Token);
-        await s.Recipes.LogAsync(Today.AddDays(-1), Meal.Breakfast, id, 1, Token);
-        await s.Data.Diary.AddEntryAsync(Today.AddDays(-1), Meal.Breakfast, s.Milk.Id, new EntryAmount(100, null), Token);
+        await s.Recipes.LogAsync(Today.AddDays(-1), Meal.Breakfast, new TimeOnly(8, 15), id, 1, Token);
+        await s.Data.Diary.AddEntryAsync(Today.AddDays(-1), Meal.Breakfast, DiaryData.Noon, s.Milk.Id, new EntryAmount(100, null), Token);
         await s.Recipes.UpdateAsync(id, Porridge(s, oats: 200), Token);
 
         Assert.Equal(2, await s.Data.Diary.CopyAsync(Today.AddDays(-1), Today, Meal.Breakfast, Token));
 
         var copied = (await s.Data.Diary.GetDayAsync(Today, Token)).Meals[0].Entries;
-        Assert.Equal([("Porridge", 490.0), ("Milk", 60.0)], copied.Select(e => (e.Name, e.Nutrients[Nutrients.Energy].Amount)));
+        Assert.Equal([("Porridge", new TimeOnly(8, 15), 490.0), ("Milk", DiaryData.Noon, 60.0)],
+            copied.Select(e => (e.Name, e.Time, e.Nutrients[Nutrients.Energy].Amount)));
         var yesterday = (await s.Data.Diary.GetDayAsync(Today.AddDays(-1), Token)).Meals[0].Entries;
         Assert.Equal(305, yesterday[0].Nutrients[Nutrients.Energy].Amount, 6);
     }
@@ -195,7 +199,7 @@ public class RecipesTests(PostgresFixture postgres)
         var s = await SetUpAsync();
         var logged = await s.Recipes.CreateAsync(Porridge(s), Token);
         var unused = await s.Recipes.CreateAsync(Porridge(s) with { Name = "Unused" }, Token);
-        await s.Recipes.LogAsync(Today, Meal.Breakfast, logged, 1, Token);
+        await s.Recipes.LogAsync(Today, Meal.Breakfast, DiaryData.Noon, logged, 1, Token);
 
         Assert.Equal(RecipeDeleteResult.InDiary, await s.Recipes.DeleteAsync(logged, Token));
         Assert.Equal(RecipeDeleteResult.Deleted, await s.Recipes.DeleteAsync(unused, Token));

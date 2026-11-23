@@ -24,6 +24,8 @@ public static class DiaryUrls
     public static Meal? ParseMeal(string? text) =>
         Enum.TryParse<Meal>(text, ignoreCase: true, out var meal) && Enum.IsDefined(meal) ? meal : null;
 
+    public static string TimeOfDay(TimeOnly time) => time.ToString("HH:mm", CultureInfo.InvariantCulture);
+
     public static string DayTitle(DateOnly date, DateOnly today) => (date.DayNumber - today.DayNumber) switch
     {
         0 => "Today",

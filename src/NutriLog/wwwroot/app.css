@@ -41,6 +41,7 @@ a { color:var(--accent); }
 h2 { font-size:1.1rem; margin:0; }
 label { display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--muted); min-width:0; }
 input, select { font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; min-width:0; width:100%; }
+input[type=time] { color-scheme:dark; }
 fieldset { border:1px solid var(--line); border-radius:8px; margin:0; padding:12px; display:flex; flex-direction:column; gap:10px; min-width:0; }
 legend { color:var(--muted); font-size:0.85rem; padding:0 4px; }
 summary { cursor:pointer; }
