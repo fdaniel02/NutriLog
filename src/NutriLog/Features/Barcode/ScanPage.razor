@@ -77,7 +77,8 @@
         {
             module = await JS.InvokeAsync<IJSObjectReference>("import", "./" + Assets["Features/Barcode/ScanPage.razor.js"]);
             self = DotNetObjectReference.Create(this);
-            camera = await module.InvokeAsync<string>("start", video, self);
+            camera = await module.InvokeAsync<string>("start", video, self,
+                "./" + Assets["lib/barcode-detector/ponyfill.js"], "./" + Assets["lib/barcode-detector/zxing_reader.wasm"]);
         }
         catch (JSException)
         {

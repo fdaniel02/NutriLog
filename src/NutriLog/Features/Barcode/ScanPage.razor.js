@@ -2,15 +2,16 @@ const formats = new Set(['ean_13', 'ean_8', 'upc_a', 'upc_e']);
 let stream;
 let timer;
 
-export async function start(video, page) {
-    if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
+export async function start(video, page, zxingModuleUrl, zxingWasmUrl) {
+    if (!navigator.mediaDevices?.getUserMedia) {
         return 'unsupported';
     }
-    const supported = (await BarcodeDetector.getSupportedFormats()).filter(f => formats.has(f));
-    if (supported.length === 0) {
+    let detector;
+    try {
+        detector = await createDetector(zxingModuleUrl, zxingWasmUrl);
+    } catch {
         return 'unsupported';
     }
-    const detector = new BarcodeDetector({ formats: supported });
     try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     } catch {
@@ -37,6 +38,26 @@ export async function start(video, page) {
     };
     void scan();
     return 'started';
+}
+
+// Chrome on Android has a built-in detector; Firefox has none, and Chrome on Windows has one without any formats.
+async function createDetector(zxingModuleUrl, zxingWasmUrl) {
+    if ('BarcodeDetector' in window) {
+        const supported = (await BarcodeDetector.getSupportedFormats()).filter(f => formats.has(f));
+        if (supported.length > 0) {
+            return new BarcodeDetector({ formats: supported });
+        }
+    }
+    // Relative URLs would resolve against this module's folder, not the app's base.
+    const wasm = new URL(zxingWasmUrl, document.baseURI).href;
+    const zxing = await import(new URL(zxingModuleUrl, document.baseURI).href);
+    // Without locateFile the library fetches the .wasm from jsDelivr. Loading it now, not on the first frame,
+    // turns a failed download into "unsupported" instead of a camera that never scans.
+    await zxing.prepareZXingModule({
+        overrides: { locateFile: (path, prefix) => path.endsWith('.wasm') ? wasm : prefix + path },
+        fireImmediately: true
+    });
+    return new zxing.BarcodeDetector({ formats: [...formats] });
 }
 
 export function stop() {

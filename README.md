@@ -28,6 +28,28 @@ dotnet restore --force-evaluate
 The Docker image builds with the newest .NET 10 SDK and runtime (`sdk:10.0` and `aspnet:10.0`) and restores without
 locked mode, so it picks up .NET patches on every build without depending on `global.json`.
 
+### Barcode decoder
+
+Browsers without a built-in `BarcodeDetector` for EAN/UPC (Firefox; Chrome and Edge on Windows) scan with
+[barcode-detector](https://github.com/Sec-ant/barcode-detector), ZXing C++ compiled to WebAssembly. Its files are
+committed in `src/NutriLog/wwwroot/lib/barcode-detector/` (currently barcode-detector 3.2.3 with zxing-wasm 3.1.6),
+so Dependabot doesn't update them. To upgrade, pick a barcode-detector release at least two weeks old, then:
+
+```bash
+# from the repository root
+lib="$PWD/src/NutriLog/wwwroot/lib/barcode-detector"
+cd "$(mktemp -d)"
+npm pack barcode-detector@<version>
+tar xzf barcode-detector-*.tgz
+zxing=$(node -p "require('./package/package.json').dependencies['zxing-wasm']")
+npm pack "zxing-wasm@$zxing"
+mkdir zxing && tar xzf zxing-wasm-*.tgz -C zxing
+cp package/dist/es/ponyfill.js package/dist/es/zxing-exported.js package/LICENSE "$lib"/
+cp zxing/package/dist/reader/zxing_reader.wasm "$lib"/
+```
+
+Then update the versions above and check scanning in Firefox.
+
 ## Build and test
 
 ```powershell
