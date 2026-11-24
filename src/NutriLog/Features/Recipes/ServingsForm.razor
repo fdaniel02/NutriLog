@@ -16,6 +16,13 @@
             Time
             <input type="time" required @bind="time" />
         </label>
+        @if (DateChanged.HasDelegate)
+        {
+            <label>
+                Date
+                <input type="date" required value="@(Date is { } d ? DiaryUrls.Format(d) : "")" @onchange="ChangeDateAsync" />
+            </label>
+        }
     </div>
     @if (Amount is { } amount)
     {
@@ -33,7 +40,7 @@
         <p class="amount-preview muted">Enter an amount above 0.</p>
     }
     <div class="form-actions">
-        <button type="submit" class="button primary" disabled="@(Amount is null || time is null || busy)">@SubmitLabel</button>
+        <button type="submit" class="button primary" disabled="@(!CanSubmit)">@SubmitLabel</button>
         @ChildContent
     </div>
 </form>
@@ -57,6 +64,13 @@
 
     [Parameter]
     public string SubmitLabel { get; set; } = "Add";
+
+    // Shown only with DateChanged: the entry page edits an entry on its own day.
+    [Parameter]
+    public DateOnly? Date { get; set; }
+
+    [Parameter]
+    public EventCallback<DateOnly?> DateChanged { get; set; }
 
     [Parameter]
     public EventCallback<(TimeOnly Time, RecipeAmount Amount)> OnSubmit { get; set; }
@@ -92,9 +106,13 @@
             : Math.Round(q / Snapshot.ServingGrams, 2);
     }
 
+    bool CanSubmit => Amount is not null && time is not null && (Date is not null || !DateChanged.HasDelegate) && !busy;
+
+    Task ChangeDateAsync(ChangeEventArgs e) => DateChanged.InvokeAsync(DiaryUrls.ParseDate(e.Value as string));
+
     async Task SubmitAsync()
     {
-        if (Amount is not { } amount || time is not { } eaten || busy)
+        if (!CanSubmit || Amount is not { } amount || time is not { } eaten)
             return;
         busy = true;
         try

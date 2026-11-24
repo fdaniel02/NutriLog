@@ -171,6 +171,80 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
     }
 
     [Fact]
+    public async Task The_date_starts_at_today_also_for_another_day()
+    {
+        var data = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", []);
+        Navigation.NavigateTo(DiaryUrls.Add(Today.AddDays(-3), bread.Id));
+
+        var page = Render<AddPage>();
+
+        page.WaitForElement("form.amount-form");
+        Assert.Equal("2026-11-22", page.Find("input[type=date]").GetAttribute("value"));
+        Assert.Equal("Add to today", page.Find("h1").TextContent);
+        Assert.Equal(DiaryUrls.Day(Today.AddDays(-3)), page.Find(".back-nav a").GetAttribute("href"));
+    }
+
+    [Fact]
+    public async Task Adding_again_from_yesterday_adds_to_today()
+    {
+        var data = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", [], ("slice", 35));
+        var yesterday = Today.AddDays(-1);
+        await data.Diary.AddEntryAsync(yesterday, DiaryData.Noon, bread.Id, new EntryAmount(2, bread.Portions[0].Id), Token);
+        Navigation.NavigateTo(DiaryUrls.AddAgain(yesterday, new LoggedAmount(bread.Id, null, 2, bread.Portions[0].Id)));
+        var page = Render<AddPage>();
+        page.WaitForElement("form.amount-form");
+
+        page.Find("form").Submit();
+
+        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));
+        Assert.Equal(["2 × slice · 70 g"], (await data.Diary.GetDayAsync(Today, Token)).Entries.Select(e => e.Amount));
+        Assert.Single((await data.Diary.GetDayAsync(yesterday, Token)).Entries);
+    }
+
+    [Fact]
+    public async Task Adds_to_the_chosen_date()
+    {
+        var data = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", []);
+        Navigation.NavigateTo(DiaryUrls.Add(Today, bread.Id));
+        var page = Render<AddPage>();
+        page.WaitForElement("form.amount-form");
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=date]").Change("2026-11-20");
+            Assert.Equal("Add to fri 20 nov", page.Find("h1").TextContent);
+        });
+        page.Find("form").Submit();
+
+        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(new DateOnly(2026, 11, 20)), Navigation.Uri));
+        Assert.Single((await data.Diary.GetDayAsync(new DateOnly(2026, 11, 20), Token)).Entries);
+        Assert.Empty((await data.Diary.GetDayAsync(Today, Token)).Entries);
+    }
+
+    [Fact]
+    public async Task An_empty_date_disables_adding()
+    {
+        var data = await SetUpAsync();
+        var bread = await data.AddFoodAsync("Bread", []);
+        Navigation.NavigateTo(DiaryUrls.Add(Today, bread.Id));
+        var page = Render<AddPage>();
+        page.WaitForElement("form.amount-form");
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=date]").Change("");
+            Assert.True(page.Find("button[type=submit]").HasAttribute("disabled"));
+        });
+        Assert.Equal("Add food", page.Find("h1").TextContent);
+        page.Find("form").Submit();
+
+        Assert.Empty((await data.Diary.GetDayAsync(Today, Token)).Entries);
+    }
+
+    [Fact]
     public async Task Adding_again_starts_at_the_entrys_amount_and_unit()
     {
         var data = await SetUpAsync();
@@ -280,6 +354,7 @@ public class DiaryPagesTests(PostgresFixture postgres) : BunitContext
             Assert.Equal(("50", "16:20:00"), (page.Find("input[type=number]").GetAttribute("value"), page.Find("input[type=time]").GetAttribute("value")));
         });
         Assert.Single(page.FindAll("form select"));
+        Assert.Empty(page.FindAll("input[type=date]"));
         page.Find("form").Submit();
 
         page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(Today), Navigation.Uri));

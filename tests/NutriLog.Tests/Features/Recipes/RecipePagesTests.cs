@@ -226,6 +226,28 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         Assert.Equal(new LoggedAmount(null, id, 1.5, null, RecipeUnit.Servings), day.Entries[0].Logged);
     }
 
+    [Fact]
+    public async Task A_recipe_is_added_to_the_chosen_date()
+    {
+        var s = await SetUpAsync();
+        var id = await s.Recipes.CreateAsync(Porridge(s), Token);
+        var yesterday = Today.AddDays(-1);
+        Navigation.NavigateTo(RecipeUrls.AddToDay(yesterday, id));
+        var page = Render<AddPage>();
+        page.WaitForElement("form.amount-form");
+        Assert.Equal("2026-11-22", page.Find("input[type=date]").GetAttribute("value"));
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("input[type=date]").Change("2026-11-21");
+            Assert.Equal("Add to yesterday", page.Find("h1").TextContent);
+        });
+        page.Find("form").Submit();
+
+        page.WaitForAssertion(() => Assert.EndsWith(DiaryUrls.Day(yesterday), Navigation.Uri));
+        Assert.Single((await s.Data.Diary.GetDayAsync(yesterday, Token)).Entries);
+    }
+
     [Theory]
     [InlineData(1.5, RecipeUnit.Servings, "1.5", "Servings", "1.5 servings · 375 g")]
     [InlineData(0, RecipeUnit.Servings, "1", "Servings", "1 serving · 250 g")]
@@ -316,6 +338,7 @@ public class RecipePagesTests(PostgresFixture postgres) : BunitContext
         page.WaitForElement("form.amount-form");
 
         Assert.StartsWith("1 serving · 250 g: 305 kcal", Squeezed(page.Find(".amount-preview").TextContent));
+        Assert.Empty(page.FindAll("input[type=date]"));
         page.WaitForAssertion(() =>
         {
             page.Find("input[type=number]").Change("2");

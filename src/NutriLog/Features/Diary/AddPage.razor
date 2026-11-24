@@ -11,17 +11,17 @@
 <nav class="back-nav">
     <a href="@DiaryUrls.Day(date)">‹ @DiaryUrls.DayTitle(date, Clock.Today)</a>
 </nav>
-<h1>Add to @DiaryUrls.DayTitle(date, Clock.Today).ToLowerInvariant()</h1>
+<h1>@Heading</h1>
 
 @if (recipe is not null)
 {
-    <ServingsForm Name="@recipe.Name" Snapshot="recipe.Snapshot" InitialAmount="InitialRecipeAmount" InitialTime="now" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
+    <ServingsForm Name="@recipe.Name" Snapshot="recipe.Snapshot" InitialAmount="InitialRecipeAmount" InitialTime="now" @bind-Date="entryDate" SubmitLabel="Add" OnSubmit="AddRecipeAsync">
         <a class="button" href="@DiaryUrls.Add(date)">Other food</a>
     </ServingsForm>
 }
 else if (food is not null)
 {
-    <AmountForm Food="food" Initial="InitialAmount" InitialTime="now" SubmitLabel="Add" OnSubmit="AddAsync">
+    <AmountForm Food="food" Initial="InitialAmount" InitialTime="now" @bind-Date="entryDate" SubmitLabel="Add" OnSubmit="AddAsync">
         <a class="button" href="@DiaryUrls.Add(date)">Other food</a>
         @if (NutriLog.Features.Foods.Foods.IsEditable(food.Source))
         {
@@ -98,7 +98,9 @@ else
     [SupplyParameterFromQuery(Name = "grams")]
     public double? Grams { get; set; }
 
+    // The day the page was opened from, for the way back; entries go to entryDate, which starts at today.
     DateOnly date;
+    DateOnly? entryDate;
     TimeOnly now;
     FoodChoice? food;
     RecipeDetails? recipe;
@@ -110,6 +112,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         date = DiaryUrls.ParseDate(DateText) ?? Clock.Today;
+        entryDate = Clock.Today;
         now = Clock.Now;
         food = FoodId is { } id ? await Diary.GetFoodAsync(id) : null;
         recipe = RecipeId is { } recipeId ? await Recipes.GetAsync(recipeId) : null;
@@ -130,15 +133,19 @@ else
 
     async Task AddAsync((TimeOnly Time, EntryAmount Amount) input)
     {
-        await Diary.AddEntryAsync(date, input.Time, food!.Id, input.Amount);
-        Navigation.NavigateTo(DiaryUrls.Day(date));
+        var day = entryDate!.Value;
+        await Diary.AddEntryAsync(day, input.Time, food!.Id, input.Amount);
+        Navigation.NavigateTo(DiaryUrls.Day(day));
     }
 
     async Task AddRecipeAsync((TimeOnly Time, RecipeAmount Amount) input)
     {
-        await Recipes.LogAsync(date, input.Time, recipe!.Id, input.Amount);
-        Navigation.NavigateTo(DiaryUrls.Day(date));
+        var day = entryDate!.Value;
+        await Recipes.LogAsync(day, input.Time, recipe!.Id, input.Amount);
+        Navigation.NavigateTo(DiaryUrls.Day(day));
     }
+
+    string Heading => entryDate is { } day ? $"Add to {DiaryUrls.DayTitle(day, Clock.Today).ToLowerInvariant()}" : "Add food";
 
     // From "add again": the amount of the entry it repeats, unless it doesn't fit the food.
     EntryAmount? InitialAmount =>
